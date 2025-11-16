@@ -1,0 +1,18 @@
+# Python build artifacts
+/dist/
+/build/
+/*.egg-info/
+**/__pycache__/
+
+# Virtual envs
+.venv/
+
+# macOS
+.DS_Store
+
+# Local wheels and tarballs under py/
+py/*.whl
+py/*.tar.gz
+
+# CMake/Ninja build dirs if created locally
+cpp/trimci_core/build/

@@ -1,0 +1,49 @@
+name: Publish TestPyPI Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: 'CI run id to download artifacts from (optional)'
+        required: false
+        type: string
+
+jobs:
+  publish_testpypi_only:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Download artifacts from specified run id
+        if: ${{ inputs.source_run_id != '' }}
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          github_token: ${{ github.token }}
+          run_id: ${{ inputs.source_run_id }}
+          path: artifacts
+      - name: Download artifacts from latest successful CI run
+        if: ${{ inputs.source_run_id == '' }}
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          github_token: ${{ github.token }}
+          workflow: .github/workflows/ci.yml
+          workflow_conclusion: success
+          path: artifacts
+      - name: Collect distribution files
+        run: |
+          mkdir -p dist
+          find artifacts -type f -name "*.whl" -exec cp {} dist \;
+          find artifacts -type f -name "*.tar.gz" -exec cp {} dist \;
+          ls -la dist
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
