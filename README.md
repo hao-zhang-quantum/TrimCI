@@ -1,5 +1,7 @@
 <p align="center">
-  <img src="banner.png" alt="TrimCI banner" width="800"/>
+  <img src="https://raw.githubusercontent.com/hao-zhang-quantum/TrimCI/44341c9d1a0cd070ed9c06ad4b1e437a54358514/banner.png"
+       alt="TrimCI banner"
+       width="800"/>
 </p>
 
 
@@ -10,12 +12,14 @@ It constructs accurate ground states *directly from random Slater determinants* 
 
 TrimCI demonstrates that accurate many-body ground states can *emerge from randomness*, achieving state-of-the-art accuracy and efficiency across molecular and lattice systems. It can **outperform human-designed ansatzes or human-provided knowledge** in hard problems, such as strongly correlated systems.
 
+**Paper**: to be posted soon.
+
 ---
 
 ## 🚀 Install
 
 ```
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple trimci==0.1.0
+pip install trimci
 ```
 
 Alternatively, you may build the package on your environment `python -m pip install .`.
@@ -39,7 +43,7 @@ tci --auto --goal accuracy -n 1000
 
 
 3) A custom run in FULL mode.
-See trimci_tutorial.ipynb for more details.
+See `trimci_tutorial.ipynb` for more details.
 
 
 4) More details are in the `paper` and `py/trimci/TrimCI_runner/trimci_driver.py`.

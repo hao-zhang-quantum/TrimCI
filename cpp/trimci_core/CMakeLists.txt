@@ -13,10 +13,12 @@ set(EIGEN_LOCAL_DIR "${CMAKE_SOURCE_DIR}/../../third_party/eigen")
 if(EXISTS "${EIGEN_LOCAL_DIR}/Eigen/Core")
     message(STATUS "Using vendored Eigen at ${EIGEN_LOCAL_DIR}")
     set(EIGEN3_INCLUDE_DIR "${EIGEN_LOCAL_DIR}")
-    add_library(Eigen3::Eigen INTERFACE IMPORTED)
-    set_target_properties(Eigen3::Eigen PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES "${EIGEN3_INCLUDE_DIR}"
-    )
+    if(NOT TARGET Eigen3::Eigen)
+        add_library(Eigen3::Eigen INTERFACE IMPORTED)
+        set_target_properties(Eigen3::Eigen PROPERTIES
+            INTERFACE_INCLUDE_DIRECTORIES "${EIGEN3_INCLUDE_DIR}"
+        )
+    endif()
 else()
     # Fall back to system package
     find_package(Eigen3 3.3 QUIET NO_MODULE)
@@ -28,12 +30,14 @@ else()
             GIT_SHALLOW TRUE
         )
         FetchContent_MakeAvailable(eigen)
-        # Set include dir and provide a compatible imported target
+        # Set include dir and provide a compatible imported target only if not already present
         set(EIGEN3_INCLUDE_DIR "${eigen_SOURCE_DIR}")
-        add_library(Eigen3::Eigen INTERFACE IMPORTED)
-        set_target_properties(Eigen3::Eigen PROPERTIES
-            INTERFACE_INCLUDE_DIRECTORIES "${EIGEN3_INCLUDE_DIR}"
-        )
+        if(NOT TARGET Eigen3::Eigen)
+            add_library(Eigen3::Eigen INTERFACE IMPORTED)
+            set_target_properties(Eigen3::Eigen PROPERTIES
+                INTERFACE_INCLUDE_DIRECTORIES "${EIGEN3_INCLUDE_DIR}"
+            )
+        endif()
         message(STATUS "Fetched Eigen3 headers from ${EIGEN3_INCLUDE_DIR}")
     else()
         # Ensure EIGEN3_INCLUDE_DIR is defined when found via config
