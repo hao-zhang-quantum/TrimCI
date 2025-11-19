@@ -344,7 +344,7 @@ def run_full_calculation(fcidump_path: str = None,
 def run_auto(fcidump_path: str = None,
              molecule: str = None, basis: str = "sto-3g", spin: int = 0,
              goal: str = "balanced",
-             ndets: int = 100,
+             ndets: int = None,
              ndets_explore: int = None,
              nexploration: int = None,
              trimci_config_path: str = None, config_dict: dict = None, **overrides):
@@ -377,6 +377,7 @@ def run_auto(fcidump_path: str = None,
     if fcidump_path and molecule:
         raise ValueError("fcidump_path and molecule are mutually exclusive")
 
+    
     # --- Prepare system data ---
     if fcidump_path:
         h1, eri, n_elec, n_orb, nuclear_repulsion, n_alpha, n_beta = read_fcidump(fcidump_path)
@@ -398,8 +399,7 @@ def run_auto(fcidump_path: str = None,
     if config_dict:
         for k, v in config_dict.items():
             setattr(args, k, v)
-    for k, v in overrides.items():
-        setattr(args, k, v)
+
 
     setup_logging(getattr(args, 'verbose', False))
 
@@ -423,32 +423,45 @@ def run_auto(fcidump_path: str = None,
     total_configs = comb(n_orb, n_alpha) * comb(n_orb, n_beta)
     log10_configs = math.log10(total_configs) if total_configs > 0 else 0.0
 
-    # Helper: choose scale category by total configuration space size
-    def scale_category(n_orb_val: int, n_alpha_val: int, n_beta_val: int) -> str:
-        # Estimate total number of determinants: C(n_orb, n_alpha) * C(n_orb, n_beta)
-        # Use log10 thresholds to avoid huge integers
-        if log10_configs < 8:   # ~ up to 1e6
-            return "small"
-        elif log10_configs < 16: # ~ up to 1e8
-            return "medium"
-        elif log10_configs < 24:# ~ up to 1e10
-            return "large"
-        else:
-            return "xlarge"
 
-    cat = scale_category(n_orb, n_alpha, n_beta)
+    if log10_configs < 8:   # ~ up to 1e6
+        if ndets is None:
+            ndets = 50
+        cat = "small"
+    elif log10_configs < 16: # ~ up to 1e8
+        if ndets is None:
+            ndets = 100
+        cat = "medium"
+    elif log10_configs < 24:# ~ up to 1e10
+        if ndets is None:
+            ndets = 200
+        cat = "large"
+    else:
+        if ndets is None:
+            ndets = 500
+        cat = "xlarge"
+
     # Helper: auto tune baseline args based on size & goal
     def auto_tune(base: Namespace, n_orb_val: int, n_alpha_val: int, n_beta_val: int, goal_val: str, ndets_val: int = None) -> Namespace:
         tuned = clone(base)
         
         if cat == "small":
-            tuned.initial_pool_size = 100
-            tuned.pool_core_ratio = 15
-            tuned.local_trim_keep_ratio = 0.15
-            tuned.threshold = 0.06
-            tuned.max_final_dets = 50
-            tuned.max_rounds = 2
-            tuned.num_groups = 10
+            if log10_configs < 4:
+                tuned.initial_pool_size = 50
+                tuned.pool_core_ratio = 4
+                tuned.local_trim_keep_ratio = 0.20
+                tuned.threshold = 0.06
+                tuned.max_final_dets = 20
+                tuned.max_rounds = 2
+                tuned.num_groups = 4
+            else:
+                tuned.initial_pool_size = 100
+                tuned.pool_core_ratio = 10
+                tuned.local_trim_keep_ratio = 0.15
+                tuned.threshold = 0.06
+                tuned.max_final_dets = 50
+                tuned.max_rounds = 2
+                tuned.num_groups = 10
         elif cat == "medium":
             tuned.initial_pool_size = 200
             tuned.pool_core_ratio = 20
@@ -502,13 +515,30 @@ def run_auto(fcidump_path: str = None,
         elif cat == "medium":
             exploration_ndets = max(100, int(ndets ** 0.5))
         elif cat == "large":
-            exploration_ndets = max(500, int(ndets ** 0.5))
+            exploration_ndets = max(200, int(ndets ** 0.5))
         else:  # xlarge
             exploration_ndets = max(1000, int(ndets ** 0.5))
+
+    for k, v in overrides.items():
+        print(k)
+        if k == "max_final_dets":
+            continue
+        elif k == "explore_final_dets":
+            exploration_ndets = v
+            log_verbose(f"Overriding max_final_dets to {v} for exploration")
+            setattr(baseline, "max_final_dets", v)
+        else:
+            setattr(baseline, k, v)
 
     # Exploration variants around baseline (apply exploration budget)
     baseline_explore = clone(baseline)
     baseline_explore.max_final_dets = exploration_ndets
+
+    # edge case
+    baseline_explore.max_final_dets = min(baseline_explore.max_final_dets, total_configs)
+    baseline_explore.initial_pool_size = min(baseline_explore.initial_pool_size, total_configs)
+    
+
     variants = [baseline_explore]
 
     if nexploration is None:
@@ -518,6 +548,9 @@ def run_auto(fcidump_path: str = None,
             nexploration = 10
         else:
             nexploration = 20
+    if total_configs < 1000:
+        nexploration = max(1, nexploration // 10)
+
     if cat == "small":
         n_random = 50
     elif cat == "medium":
@@ -875,6 +908,7 @@ def iterative_workflow(h1, eri, n_alpha, n_beta, n_orb,
                                current_core_set, iter_info_init, outdir=results_dir,
                                pool=None, save_pool=save_pool)
 
+    n_total_configs = comb(n_orb, n_alpha) * comb(n_orb, n_beta)
     for iteration in range(max_iterations):
         iteration_start = time.perf_counter()
 
@@ -889,6 +923,8 @@ def iterative_workflow(h1, eri, n_alpha, n_beta, n_orb,
         log_important(f"{RED_BOLD}🔄 TrimCI iteration {iteration+1}/{max_iterations}{RESET}")
         log_verbose(f"🔧 Core set ratio: {core_set_ratio:.4f}")
 
+
+        pool_size = min(pool_size, n_total_configs)
         iter_info = {
             'iteration': iteration+1,
             'core_set_size': len(current_core_set),
@@ -1278,18 +1314,9 @@ def load_initial_dets_from_file(dets_path: str = "dets.npz", core_set: bool = Fa
                 n_dets, total_cols = dets_array.shape
                 n_uint64_pairs = total_cols // 2
                 
-                # Determine number of orbitals from the data
-                max_bits = 0
-                for i in range(n_dets):
-                    for j in range(n_uint64_pairs):
-                        alpha_val = dets_array[i, 2*j]
-                        beta_val = dets_array[i, 2*j + 1]
-                        if alpha_val > 0:
-                            max_bits = max(max_bits, alpha_val)
-                        if beta_val > 0:
-                            max_bits = max(max_bits, beta_val)
-                
-                n_orb_estimate = int(max_bits).bit_length() if max_bits > 0 else 64
+                # Determine number of orbitals from the array structure
+                # Each pair (alpha, beta) represents 64 orbitals; use pair count directly
+                n_orb_estimate = 64 * n_uint64_pairs
                 functions = get_functions_for_system(n_orb_estimate)
                 DeterminantClass = functions['determinant_class']
                 

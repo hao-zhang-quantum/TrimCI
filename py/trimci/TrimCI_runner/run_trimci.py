@@ -31,6 +31,63 @@ def parse_goal(value: str) -> str:
         f"Invalid goal: {value}. Use balanced|speed|accuracy or abbreviations b|s|a."
     )
 
+# Coerce CLI value to appropriate Python type (supports JSON lists/dicts)
+def _coerce_cli_value(v: str):
+    s = str(v).strip()
+
+    # Try JSON for lists/dicts first
+    if (s.startswith('[') and s.endswith(']')) or (s.startswith('{') and s.endswith('}')):
+        try:
+            return json.loads(s)
+        except Exception:
+            pass
+
+    ls = s.lower()
+    # Booleans
+    if ls in ('true', 'false'):
+        return ls == 'true'
+    # None/null
+    if ls in ('none', 'null'):
+        return None
+
+    # Numbers
+    try:
+        if '.' in s or 'e' in ls:
+            return float(s)
+        return int(s)
+    except ValueError:
+        # Quoted JSON string
+        if (s.startswith('"') and s.endswith('"')):
+            try:
+                return json.loads(s)
+            except Exception:
+                return s[1:-1]
+        return s
+
+# Consume multi-token JSON-like values until closing bracket
+# Joins tokens like [1, 2, 3] or {"a": 1, "b": 2}
+# Returns (combined_string, next_index)
+def _consume_json_like(tokens, start_index: int):
+    if start_index >= len(tokens):
+        return "", start_index
+    depth = 0
+    acc = []
+    i = start_index
+    first = tokens[i]
+    if not (first.startswith('[') or first.startswith('{')):
+        return first, i + 1
+    while i < len(tokens):
+        t = tokens[i]
+        acc.append(t)
+        for ch in t:
+            if ch in '[{':
+                depth += 1
+            elif ch in ']}':
+                depth -= 1
+        i += 1
+        if depth <= 0:
+            break
+    return ' '.join(acc), i
 
 
 def generate_markdown_report(result_data: dict, report_path: str, fcidump_path: str, trimci_config: dict):
@@ -129,7 +186,7 @@ def main():
     parser.add_argument("--fixed_initial_mode", action="store_true", help="No change of dets.npz")  
 
 
-    args = parser.parse_args()
+    args, unknown_args = parser.parse_known_args()
 
     # Resolve FCIDUMP path
     fcidump_path = Path(args.fcidump).resolve()
@@ -148,6 +205,49 @@ def main():
         overrides["verbose"] = True
     if args.max_final_dets is not None:
         overrides["max_final_dets"] = args.max_final_dets
+
+    # Parse unregistered CLI arguments into overrides
+    # Supports forms: --key=value, --key value, --flag (True), and short -k value
+    if 'unknown_args' in locals() and unknown_args:
+        i = 0
+        while i < len(unknown_args):
+            token = unknown_args[i]
+            if token.startswith('--'):
+                keyval = token[2:]
+                if '=' in keyval:
+                    key, val = keyval.split('=', 1)
+                    overrides[key] = _coerce_cli_value(val)
+                    i += 1
+                else:
+                    key = keyval
+                    if i + 1 < len(unknown_args) and not unknown_args[i + 1].startswith('-'):
+                        next_tok = unknown_args[i + 1]
+                        if next_tok.startswith('[') or next_tok.startswith('{'):
+                            combined, new_i = _consume_json_like(unknown_args, i + 1)
+                            overrides[key] = _coerce_cli_value(combined)
+                            i = new_i
+                        else:
+                            overrides[key] = _coerce_cli_value(next_tok)
+                            i += 2
+                    else:
+                        overrides[key] = True
+                        i += 1
+            elif token.startswith('-'):
+                key = token.lstrip('-')
+                if i + 1 < len(unknown_args) and not unknown_args[i + 1].startswith('-'):
+                    next_tok = unknown_args[i + 1]
+                    if next_tok.startswith('[') or next_tok.startswith('{'):
+                        combined, new_i = _consume_json_like(unknown_args, i + 1)
+                        overrides[key] = _coerce_cli_value(combined)
+                        i = new_i
+                    else:
+                        overrides[key] = _coerce_cli_value(next_tok)
+                        i += 2
+                else:
+                    overrides[key] = True
+                    i += 1
+            else:
+                i += 1
 
     # Run calculation
     if args.auto:

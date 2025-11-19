@@ -12,7 +12,9 @@ It constructs accurate ground states *directly from random Slater determinants* 
 
 TrimCI demonstrates that accurate many-body ground states can *emerge from randomness*, achieving state-of-the-art accuracy and efficiency across molecular and lattice systems. It can **outperform human-designed ansatzes or human-provided knowledge** in hard problems, such as strongly correlated systems.
 
-**Paper**: to be posted soon.
+**Paper**
+H. Zhang, M. Otten, “From Random Determinants to the Ground State,” arXiv:2511.14734 (2025).
+https://arxiv.org/abs/2511.14734
 
 ---
 
