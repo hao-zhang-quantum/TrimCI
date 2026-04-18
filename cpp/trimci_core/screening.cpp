@@ -63,7 +63,7 @@ DoubleExcTable precompute_double_exc_table(
     std::vector<std::vector<std::tuple<int,int,double>>> results(ij_pairs.size());
     
     #pragma omp parallel for schedule(dynamic)
-    for (size_t idx = 0; idx < ij_pairs.size(); ++idx) {
+    for (int idx = 0; idx < static_cast<int>(ij_pairs.size()); ++idx) {
         int i = ij_pairs[idx].first;
         int j = ij_pairs[idx].second;
         std::vector<std::tuple<int,int,double>> entries;
@@ -89,7 +89,7 @@ DoubleExcTable precompute_double_exc_table(
     
     // Merge results into table
     DoubleExcTable table;
-    for (size_t idx = 0; idx < ij_pairs.size(); ++idx) {
+    for (int idx = 0; idx < static_cast<int>(ij_pairs.size()); ++idx) {
         if (!results[idx].empty()) {
             table[ij_pairs[idx]] = std::move(results[idx]);
         }
@@ -644,7 +644,7 @@ pool_build_t(
                 {
                     int tid = omp_get_thread_num();
                     #pragma omp for schedule(dynamic)
-                    for (size_t idx = chunk_start; idx < chunk_end; ++idx) {
+                    for (int idx = static_cast<int>(chunk_start); idx < static_cast<int>(chunk_end); ++idx) {
                         auto det = frontier[idx];
                         double ci = 1.0;
                         if (use_coeffs) {
@@ -793,7 +793,7 @@ pool_build_t(
         {
             int tid = omp_get_thread_num();
             #pragma omp for schedule(dynamic)
-            for (size_t idx = 0; idx < frontier.size(); ++idx) {
+            for (int idx = 0; idx < static_cast<int>(frontier.size()); ++idx) {
                 auto det = frontier[idx];
                 double ci = 1.0;
                 if (use_coeffs) {
@@ -1015,7 +1015,7 @@ pool_build_t(
                 // Score-based: extract scores, partial sort, take top-K
                 std::vector<std::pair<double, size_t>> score_idx(candidates.size());
                 #pragma omp parallel for schedule(static)
-                for (size_t i = 0; i < candidates.size(); i++) {
+                for (int i = 0; i < static_cast<int>(candidates.size()); i++) {
                     auto it = pool_map.find(candidates[i]);
                     double s = (it != pool_map.end()) ? std::abs(it->second) : 0.0;
                     score_idx[i] = {s, i};
