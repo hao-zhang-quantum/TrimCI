@@ -36,7 +36,8 @@ diagonalize_subspace_davidson_t(
     int verbosity = 0,  // 0=silent, 1=basic, 2=detailed
     int n_orb = 0,
     const std::vector<double>& initial_guess = {},
-    const IntegralSparsityInfo* sparsity = nullptr
+    const IntegralSparsityInfo* sparsity = nullptr,
+    const std::string& init_strategy = "lowest_diag_noise"
 );
 
 // Wrapper
@@ -51,7 +52,8 @@ diagonalize_subspace_davidson(
     double tol = 1e-3,
     int verbosity = 0,  // 0=silent, 1=basic, 2=detailed
     int n_orb = 0,
-    const std::vector<double>& initial_guess = {}
+    const std::vector<double>& initial_guess = {},
+    const std::string& init_strategy = "lowest_diag_noise"
 );
 
 // =================================================================================
@@ -95,7 +97,8 @@ run_trim_t(
     bool save_cache,
     const std::vector<DeterminantT<StorageType>>& external_core_dets = {},
     double tol = 1e-3,
-    int verbosity = 1  // 0=silent, 1=basic, 2=detailed
+    int verbosity = 1,  // 0=silent, 1=basic, 2=detailed
+    const std::string& davidson_init = "lowest_diag_noise"
 );
 
 // Wrapper
@@ -113,7 +116,8 @@ run_trim(
     bool save_cache,
     const std::vector<Determinant>& external_core_dets,
     double tol = 1e-3,
-    int verbosity = 1  // 0=silent, 1=basic, 2=detailed
+    int verbosity = 1,  // 0=silent, 1=basic, 2=detailed
+    const std::string& davidson_init = "lowest_diag_noise"
 );
 
 std::pair<std::vector<std::vector<double>>, std::vector<double>>

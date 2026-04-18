@@ -35,12 +35,14 @@ struct IterativeWorkflowParams {
     int pool_core_ratio = 10;
     std::string pool_build_strategy = "heat_bath";
     double threshold = 0.01;
+    double first_cycle_threshold = -1.0;  // If > 0, override threshold for iteration 1 only
     double threshold_decay = 0.9;
     int max_rounds = 1;
     std::vector<int> attentive_orbitals;
     int strategy_factor = -1;
     double e0 = 0.0;  // For PT2 modes
     bool pool_strict_target_size = false;  // If true, truncate pool to exactly target_size
+    int max_pool_size = 0;  // Hard cap on pool size during merge (0=no limit)
     int stagnation_limit = 0;  // Stop if core set doesn't grow for N consecutive iterations (0=disabled)
     
     // --- DMRG-style noise ---
@@ -52,6 +54,9 @@ struct IterativeWorkflowParams {
     double local_trim_keep_ratio = 0.0;
     double keep_ratio = 0.1;
     
+    // --- Davidson Initialization ---
+    std::string davidson_init = "lowest_diag_noise";
+
     // --- Logging ---
     int verbosity = 1;  // 0=silent, 1=basic, 2=detailed
     

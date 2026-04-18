@@ -2153,6 +2153,14 @@ def generate_initial_states(n_alpha, n_beta, n_orb,
     DeterminantClass = functions['determinant_class']
     log_important(f"Using Determinant class: {DeterminantClass}")
 
+    # Determine n_segments from class name
+    class_name = str(DeterminantClass)
+    n_segments = 1
+    for bits, segs in [(512,8),(448,7),(384,6),(320,5),(256,4),(192,3),(128,2)]:
+        if f'Determinant{bits}' in class_name:
+            n_segments = segs
+            break
+
     # --- Helper: HF reference ---
     def hf_reference():
         return functions['generate_reference_det'](n_alpha, n_beta)
@@ -2210,102 +2218,96 @@ def generate_initial_states(n_alpha, n_beta, n_orb,
                 beta_bits  = beta_bits[0]
             return DeterminantClass(to_uint64(alpha_bits), to_uint64(beta_bits))
 
+    # Track all generated dets for dedup across all sources
+    seen_dets = set()
+
     # --- Preset determinants ---
     def add_preset(kind, coeff, count=1):
         for _ in range(count):
             if kind == "reference" or kind == "hf":
-                dets.append(hf_reference())
+                det = hf_reference()
             elif kind == "afm":
                 alpha_bits = sum([1 << i for i in range(0, n_orb, 2)][:n_alpha])
                 beta_bits  = sum([1 << i for i in range(1, n_orb, 2)][:n_beta])
-                dets.append(create_determinant(alpha_bits, beta_bits))
+                det = create_determinant(alpha_bits, beta_bits)
             elif kind == "paramagnetic":
                 alpha_bits = sum([1 << i for i in range(n_alpha)])
                 beta_bits  = sum([1 << i for i in range(n_beta)])
-                dets.append(create_determinant(alpha_bits, beta_bits))
+                det = create_determinant(alpha_bits, beta_bits)
             elif kind == "stripe":
                 half = n_orb // 2
                 alpha_bits = sum([1 << i for i in range(min(n_alpha, half))])
                 beta_bits  = sum([1 << i for i in range(half, half + n_beta)])
-                dets.append(create_determinant(alpha_bits, beta_bits))
-            coeffs.append(float(coeff))
+                det = create_determinant(alpha_bits, beta_bits)
+            else:
+                continue
+            key = (det.alpha, det.beta)
+            if key not in seen_dets:
+                seen_dets.add(key)
+                dets.append(det)
+                coeffs.append(float(coeff))
 
-    # --- Random determinants ---
+    # --- Random determinants (with dedup + count preservation) ---
+    def _make_bitmask_arrays(occupied_orbitals):
+        arrays = [0] * n_segments
+        for i in occupied_orbitals:
+            seg, bit = divmod(i, 64)
+            arrays[seg] |= (1 << bit)
+        return arrays
+
     def add_random(coeff, count=1):
-        for _ in range(count):
+        from scipy.special import comb as _comb
+        total_possible = int(_comb(n_orb, n_alpha)) * int(_comb(n_orb, n_beta))
+        added = 0
+        max_attempts = count * 10
+        attempts = 0
+        while added < count and attempts < max_attempts:
+            attempts += 1
             occ_alpha = rng.choice(n_orb, n_alpha, replace=False)
             occ_beta  = rng.choice(n_orb, n_beta, replace=False)
-
-            class_name = str(DeterminantClass)
-            if 'Determinant512' in class_name:
-                n_segments = 8
-            elif 'Determinant448' in class_name:
-                n_segments = 7
-            elif 'Determinant384' in class_name:
-                n_segments = 6
-            elif 'Determinant320' in class_name:
-                n_segments = 5
-            elif 'Determinant256' in class_name:
-                n_segments = 4
-            elif 'Determinant192' in class_name:
-                n_segments = 3
-            elif 'Determinant128' in class_name:
-                n_segments = 2
-            else:
-                n_segments = 1
-
-            alpha_array = [0] * n_segments
-            beta_array  = [0] * n_segments
-
-            for i in occ_alpha.tolist():
-                seg, bit = divmod(i, 64)
-                alpha_array[seg] |= (1 << bit)
-            for i in occ_beta.tolist():
-                seg, bit = divmod(i, 64)
-                beta_array[seg]  |= (1 << bit)
-
+            alpha_array = _make_bitmask_arrays(occ_alpha.tolist())
+            beta_array  = _make_bitmask_arrays(occ_beta.tolist())
             det = create_determinant(alpha_array, beta_array)
+            key = (det.alpha, det.beta)
+            if key in seen_dets:
+                continue
+            seen_dets.add(key)
             dets.append(det)
             coeffs.append(float(coeff))
+            added += 1
+            if len(seen_dets) >= total_possible:
+                break
+        if added < count:
+            log_important(f"add_random: requested {count}, generated {added} "
+                          f"(space exhausted or max_attempts reached)")
 
-    # --- Random closed shell determinants ---
+    # --- Random closed shell determinants (with dedup + count preservation) ---
     def add_random_closed_shell(coeff, count=1):
         if n_alpha != n_beta:
             raise ValueError(f"random_closed_shell requires n_alpha ({n_alpha}) == n_beta ({n_beta})")
-
-        for _ in range(count):
+        from scipy.special import comb as _comb
+        total_possible = int(_comb(n_orb, n_alpha))
+        added = 0
+        max_attempts = count * 10
+        attempts = 0
+        while added < count and attempts < max_attempts:
+            attempts += 1
             occ = rng.choice(n_orb, n_alpha, replace=False)
-            
-            class_name = str(DeterminantClass)
-            if 'Determinant512' in class_name:
-                n_segments = 8
-            elif 'Determinant448' in class_name:
-                n_segments = 7
-            elif 'Determinant384' in class_name:
-                n_segments = 6
-            elif 'Determinant320' in class_name:
-                n_segments = 5
-            elif 'Determinant256' in class_name:
-                n_segments = 4
-            elif 'Determinant192' in class_name:
-                n_segments = 3
-            elif 'Determinant128' in class_name:
-                n_segments = 2
-            else:
-                n_segments = 1
-
-            alpha_array = [0] * n_segments
-            
-            for i in occ.tolist():
-                seg, bit = divmod(i, 64)
-                alpha_array[seg] |= (1 << bit)
-            
-            # For closed shell, beta is same as alpha
+            alpha_array = _make_bitmask_arrays(occ.tolist())
             beta_array = list(alpha_array)
-
             det = create_determinant(alpha_array, beta_array)
+            key = (det.alpha, det.beta)
+            if key in seen_dets:
+                continue
+            seen_dets.add(key)
             dets.append(det)
             coeffs.append(float(coeff))
+            added += 1
+            if len(seen_dets) >= total_possible:
+                break
+        if added < count:
+            log_important(f"add_random_closed_shell: requested {count}, generated {added} "
+                          f"(space exhausted or max_attempts reached)")
 
     # --- Random excited determinants ---
     def add_random_excited(config):
@@ -2604,10 +2606,12 @@ def iterative_workflow(h1, eri, n_alpha, n_beta, n_orb,
     params.pool_core_ratio = getattr(args, 'pool_core_ratio', 10)
     params.pool_build_strategy = getattr(args, 'pool_build_strategy', 'heat_bath')
     params.threshold = getattr(args, 'threshold', 0.01)
+    params.first_cycle_threshold = getattr(args, 'first_cycle_threshold', -1.0)
     params.threshold_decay = getattr(args, 'threshold_decay', 0.9)
     params.max_rounds = getattr(args, 'max_rounds', 1)
     params.strategy_factor = getattr(args, 'strategy_factor', -1)
     params.pool_strict_target_size = getattr(args, 'pool_strict_target_size', False)
+    params.max_pool_size = getattr(args, 'max_pool_size', 0)
     params.stagnation_limit = getattr(args, 'stagnation_limit', 3)
     
     _attentive = getattr(args, 'attentive_orbitals', None)
@@ -2626,6 +2630,7 @@ def iterative_workflow(h1, eri, n_alpha, n_beta, n_orb,
     
     # Verbosity
     params.verbosity = getattr(args, 'verbosity', 1)
+    params.davidson_init = getattr(args, 'davidson_init', 'lowest_diag_noise')
     
     # Saving parameters
     params.save_period = getattr(args, 'save_period', 1000000)  # Default: effectively disabled
@@ -2675,6 +2680,20 @@ def iterative_workflow(h1, eri, n_alpha, n_beta, n_orb,
         initial_dets = [ref_det]
         initial_coeffs = [1.0]
     
+    # Deduplicate initial dets (keep first occurrence, preserve order)
+    n_before = len(initial_dets)
+    seen_keys = set()
+    unique_dets, unique_coeffs = [], []
+    for d, c in zip(initial_dets, initial_coeffs):
+        key = (d.alpha, d.beta)
+        if key not in seen_keys:
+            seen_keys.add(key)
+            unique_dets.append(d)
+            unique_coeffs.append(c)
+    initial_dets, initial_coeffs = unique_dets, unique_coeffs
+    if len(initial_dets) < n_before:
+        log_important(f"Dedup: {n_before} -> {len(initial_dets)} initial dets")
+
     # =========================================================================
     # Call C++ backend
     # =========================================================================

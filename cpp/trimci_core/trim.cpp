@@ -113,7 +113,8 @@ diagonalize_subspace_davidson_t(
     int verbosity,  // 0=silent, 1=basic, 2=detailed
     int n_orb,
     const std::vector<double>& initial_guess,
-    const IntegralSparsityInfo* sparsity
+    const IntegralSparsityInfo* sparsity,
+    const std::string& init_strategy
 ) {
     // if(verbosity >= 2) std::cout << "[DavidsonT] Start. dim=" << dets.size() << ", n_orb=" << n_orb << std::endl;
     auto total_start = std::chrono::high_resolution_clock::now();
@@ -296,69 +297,101 @@ diagonalize_subspace_davidson_t(
         H = Hf.cast<double>();
     }
 
-    // Davidson loop
+    // Davidson loop — incremental SpMV caching
+    // H stores lower triangle only; use selfadjointView for symmetric SpMV
+    auto H_sym = H.selfadjointView<Eigen::Lower>();
     Vec H_diag = H.diagonal();
-    Mat V = Mat::Zero(dim, max_iter);
+    const int restart_size = std::min(max_iter / 2, 10);
+    const int max_subspace = restart_size + 1;
+    Mat V = Mat::Zero(dim, max_subspace);
+    Mat HV = Mat::Zero(dim, max_subspace);
+    Mat H_sub_cached = Mat::Zero(max_subspace, max_subspace);
+
     Vec v0 = Vec::Zero(dim);
 
-    if (!initial_guess.empty() && static_cast<size_t>(dim) == initial_guess.size()) {
-        // Use warm start from user-provided coefficients
-        for (int i = 0; i < dim; ++i) v0(i) = initial_guess[i];
+    // Select initialization strategy
+    if (init_strategy == "lowest_diag" || init_strategy == "lowest_diag_noise") {
+        int min_idx = 0;
+        double min_val = H_diag(0);
+        for (int i = 1; i < dim; ++i) {
+            if (H_diag(i) < min_val) { min_val = H_diag(i); min_idx = i; }
+        }
+        v0(min_idx) = 1.0;
+        if (init_strategy == "lowest_diag_noise") {
+            static thread_local std::mt19937_64 rng_ld{timestamp_seed()};
+            std::normal_distribution<double> dist(0.0, 0.01);
+            for (int i = 0; i < dim; ++i) v0(i) += dist(rng_ld);
+        }
         v0.normalize();
-        if (verbosity >= 2) std::cout << "  [DavidsonT] Using warm start initial guess.\n";
-    } else {
-        // Default: random initialization (robust against excited state locking)
-        // Using thread-local RNG for thread safety
-        static thread_local std::mt19937_64 rng{timestamp_seed()};
+        if (verbosity >= 2)
+            std::cout << "  [Davidson] Init: " << init_strategy
+                      << " (idx=" << min_idx << ", H_ii=" << min_val << ")\n";
+    } else if (init_strategy == "random") {
+        static thread_local std::mt19937_64 rng_r{timestamp_seed()};
         std::normal_distribution<double> dist(0.0, 1.0);
-        for (int i = 0; i < dim; ++i) v0(i) = dist(rng);
+        for (int i = 0; i < dim; ++i) v0(i) = dist(rng_r);
         v0.normalize();
-        if (verbosity >= 2) std::cout << "  [DavidsonT] Using random initial guess.\n";
+        if (verbosity >= 2) std::cout << "  [Davidson] Init: random\n";
+    } else {
+        // "warm" (default): use provided initial guess, fallback to random
+        if (!initial_guess.empty() && static_cast<size_t>(dim) == initial_guess.size()) {
+            for (int i = 0; i < dim; ++i) v0(i) = initial_guess[i];
+            v0.normalize();
+            if (verbosity >= 2) std::cout << "  [Davidson] Init: warm start\n";
+        } else {
+            static thread_local std::mt19937_64 rng_f{timestamp_seed()};
+            std::normal_distribution<double> dist(0.0, 1.0);
+            for (int i = 0; i < dim; ++i) v0(i) = dist(rng_f);
+            v0.normalize();
+            if (verbosity >= 2) std::cout << "  [Davidson] Init: random (no warm data)\n";
+        }
     }
+
     V.col(0) = v0;
+    HV.col(0) = H_sym * v0;
+    H_sub_cached(0, 0) = v0.dot(HV.col(0));
 
     int current_subspace_size = 1;
     double current_energy = 0.0;
     Vec current_ritz_vec;
-    
-    // Loop
+
     double prev_energy = 0.0;
-    const int restart_size = std::min(max_iter / 2, 10);
 
     for (int iter = 0; iter < max_iter; ++iter) {
-        Mat V_current = V.leftCols(current_subspace_size);
-        Mat HV_current = H * V_current;
-        Mat H_sub = V_current.transpose() * HV_current;
+        Mat H_sub = H_sub_cached.topLeftCorner(current_subspace_size, current_subspace_size);
 
         Eigen::SelfAdjointEigenSolver<Mat> sub_solver(H_sub);
         current_energy = sub_solver.eigenvalues()(0);
         Vec sub_ritz_vec = sub_solver.eigenvectors().col(0);
+
+        Mat V_current = V.leftCols(current_subspace_size);
         current_ritz_vec = V_current * sub_ritz_vec;
 
-        Vec Hv = HV_current * sub_ritz_vec;
+        Vec Hv = HV.leftCols(current_subspace_size) * sub_ritz_vec;
         Vec residual = Hv - current_energy * current_ritz_vec;
         double res_norm = residual.norm();
         double energy_change = std::abs(current_energy - prev_energy);
         prev_energy = current_energy;
 
         if (verbosity >= 2) {
-            std::cout << "  [DavidsonT] " << iter << ": E=" 
+            std::cout << "  [Davidson] " << iter << ": E="
                       << std::fixed << std::setprecision(10) << current_energy
                       << " |r|=" << std::scientific << res_norm << std::defaultfloat << "\n";
         }
-        
-        // Convergence
+
         if (iter > 0 && res_norm < tol && energy_change < tol * 1e-2) break;
 
-        // Restart
         if (current_subspace_size >= restart_size && current_subspace_size < max_iter && current_subspace_size < dim) {
+            double ritz_norm = current_ritz_vec.norm();
+            if (ritz_norm > 1e-15) current_ritz_vec /= ritz_norm;
             V.col(0) = current_ritz_vec;
+            HV.col(0) = H_sym * current_ritz_vec;
+            H_sub_cached(0, 0) = current_ritz_vec.dot(HV.col(0));
             current_subspace_size = 1;
         } else if (current_subspace_size >= max_iter || current_subspace_size >= dim) {
             break;
         }
 
-        // Preconditioner
         const double shift = 0.1;
         Vec correction = Vec::Zero(dim);
         for (int i = 0; i < dim; ++i) {
@@ -366,7 +399,6 @@ diagonalize_subspace_davidson_t(
             if (std::abs(denom) > 1e-12) correction(i) = -residual(i) / denom;
         }
 
-        // Project out
         if (current_subspace_size > 0) {
             Mat V_proj = V.leftCols(current_subspace_size);
             correction -= V_proj * (V_proj.transpose() * correction);
@@ -375,15 +407,35 @@ diagonalize_subspace_davidson_t(
         double c_norm = correction.norm();
         if (c_norm > 1e-12) {
             correction /= c_norm;
-            V.col(current_subspace_size++) = correction;
+            int k = current_subspace_size;
+            V.col(k) = correction;
+            HV.col(k) = H_sym * correction;
+            for (int j = 0; j <= k; ++j) {
+                double val = V.col(j).dot(HV.col(k));
+                H_sub_cached(j, k) = val;
+                H_sub_cached(k, j) = val;
+            }
+            current_subspace_size++;
         } else {
-             // Collapse or done
              if (iter == 0 && res_norm > 1e-12) {
-                 V.col(current_subspace_size++) = residual / res_norm;
+                 Vec res_normalized = residual / res_norm;
+                 int k = current_subspace_size;
+                 V.col(k) = res_normalized;
+                 HV.col(k) = H_sym * res_normalized;
+                 for (int j = 0; j <= k; ++j) {
+                     double val = V.col(j).dot(HV.col(k));
+                     H_sub_cached(j, k) = val;
+                     H_sub_cached(k, j) = val;
+                 }
+                 current_subspace_size++;
                  continue;
              }
         }
     }
+
+    // Normalize the Ritz vector before returning
+    double final_norm = current_ritz_vec.norm();
+    if (final_norm > 1e-15) current_ritz_vec /= final_norm;
 
     std::vector<double> coeffs(dim);
     for (int i = 0; i < dim; ++i) coeffs[i] = current_ritz_vec(i);
@@ -402,9 +454,10 @@ diagonalize_subspace_davidson(
     double tol,
     int verbosity,
     int n_orb,
-    const std::vector<double>& initial_guess
+    const std::vector<double>& initial_guess,
+    const std::string& init_strategy
 ) {
-    return diagonalize_subspace_davidson_t<uint64_t>(dets, h1, eri, cache, quantization, max_iter, tol, verbosity, n_orb, initial_guess);
+    return diagonalize_subspace_davidson_t<uint64_t>(dets, h1, eri, cache, quantization, max_iter, tol, verbosity, n_orb, initial_guess, nullptr, init_strategy);
 }
 
 // =================================================================================
@@ -480,12 +533,13 @@ run_trim_t(
     bool save_cache,
     const std::vector<DeterminantT<StorageType>>& external_core_dets,
     double tol,
-    int verbosity
+    int verbosity,
+    const std::string& davidson_init
 ) {
     if (verbosity >= 1) {
         std::cout << "[Trim] Start. Pool=" << params_initial_pool.size() << "\n";
     }
-    
+
     HijCacheT<StorageType> cache;
     std::string cache_file;
     std::tie(cache, cache_file) = load_or_create_Hij_cache_t<StorageType>(mol_name, n_elec, n_orb);
@@ -502,6 +556,9 @@ run_trim_t(
     auto current_pool = params_initial_pool;
     auto core_dets = external_core_dets;
 
+    // Build core lookup once for pool-core dedup
+    std::unordered_set<DeterminantT<StorageType>> core_set_lookup(core_dets.begin(), core_dets.end());
+
     // Rounds
     for (size_t r = 0; r < group_sizes.size(); ++r) {
         int m = group_sizes[r];
@@ -511,8 +568,17 @@ run_trim_t(
             std::cout << "[Trim] Round " << r+1 << " (m=" << m << ", k=" << k << ")\n";
         }
 
-        auto subsets = partition_pool_t(current_pool, m);
-        // Add core to all subsets
+        // Remove core dets from pool before partitioning to avoid duplicates
+        std::vector<DeterminantT<StorageType>> pool_no_core;
+        pool_no_core.reserve(current_pool.size());
+        for (auto& d : current_pool) {
+            if (core_set_lookup.find(d) == core_set_lookup.end()) {
+                pool_no_core.push_back(d);
+            }
+        }
+
+        auto subsets = partition_pool_t(pool_no_core, m);
+        // Add core to all subsets (now guaranteed no duplicates)
         for(auto& s : subsets) s.insert(s.end(), core_dets.begin(), core_dets.end());
 
         std::vector<DeterminantT<StorageType>> selected;
@@ -523,7 +589,7 @@ run_trim_t(
             #pragma omp for schedule(dynamic)
             for(int64_t i=0; i<(int64_t)subsets.size(); ++i) {
                 if(subsets[i].empty()) continue;
-                auto [e, c] = diagonalize_subspace_davidson_t(subsets[i], h1, eri, cache, quantization, 100, tol, false, n_orb, {}, sparsity_ptr);
+                auto [e, c] = diagonalize_subspace_davidson_t(subsets[i], h1, eri, cache, quantization, 100, tol, false, n_orb, {}, sparsity_ptr, davidson_init);
                 auto top = select_top_k_dets_t(subsets[i], c, k, core_dets, false);
                 local_sel.insert(local_sel.end(), top.begin(), top.end());
             }
@@ -544,7 +610,7 @@ run_trim_t(
     if (verbosity >= 1) {
         std::cout << "[Trim] Final diagonalization...\n";
     }
-    auto [fe, fc] = diagonalize_subspace_davidson_t(current_pool, h1, eri, cache, quantization, 200, tol, verbosity, n_orb, {}, sparsity_ptr);
+    auto [fe, fc] = diagonalize_subspace_davidson_t(current_pool, h1, eri, cache, quantization, 200, tol, verbosity, n_orb, {}, sparsity_ptr, davidson_init);
     if (verbosity >= 1) {
         std::cout << "[Trim] Final E=" << std::fixed << std::setprecision(10) << fe << std::endl;
     }
@@ -572,10 +638,11 @@ run_trim(
     bool save_cache,
     const std::vector<Determinant>& external_core_dets,
     double tol,
-    int verbosity
+    int verbosity,
+    const std::string& davidson_init
 ) {
-    return run_trim_t<uint64_t>(pool, h1, eri, mol_name, n_elec, n_orb, group_sizes, keep_sizes, 
-                                quantization, save_cache, external_core_dets, tol, verbosity);
+    return run_trim_t<uint64_t>(pool, h1, eri, mol_name, n_elec, n_orb, group_sizes, keep_sizes,
+                                quantization, save_cache, external_core_dets, tol, verbosity, davidson_init);
 }
 
 // Explicit instantiations
@@ -585,13 +652,13 @@ template std::vector<std::vector<DeterminantT<std::array<uint64_t, 3>>>> partiti
 
 template std::tuple<double, std::vector<double>>
 diagonalize_subspace_davidson_t<uint64_t>(const std::vector<DeterminantT<uint64_t>>&, const std::vector<std::vector<double>>&,
-                                          const std::vector<double>&, HijCacheT<uint64_t>&, bool, int, double, int, int, const std::vector<double>&, const IntegralSparsityInfo*);
+                                          const std::vector<double>&, HijCacheT<uint64_t>&, bool, int, double, int, int, const std::vector<double>&, const IntegralSparsityInfo*, const std::string&);
 template std::tuple<double, std::vector<double>>
 diagonalize_subspace_davidson_t<std::array<uint64_t, 2>>(const std::vector<DeterminantT<std::array<uint64_t, 2>>>&, const std::vector<std::vector<double>>&,
-                                                         const std::vector<double>&, HijCacheT<std::array<uint64_t, 2>>&, bool, int, double, int, int, const std::vector<double>&, const IntegralSparsityInfo*);
+                                                         const std::vector<double>&, HijCacheT<std::array<uint64_t, 2>>&, bool, int, double, int, int, const std::vector<double>&, const IntegralSparsityInfo*, const std::string&);
 template std::tuple<double, std::vector<double>>
 diagonalize_subspace_davidson_t<std::array<uint64_t, 3>>(const std::vector<DeterminantT<std::array<uint64_t, 3>>>&, const std::vector<std::vector<double>>&,
-                                                         const std::vector<double>&, HijCacheT<std::array<uint64_t, 3>>&, bool, int, double, int, int, const std::vector<double>&, const IntegralSparsityInfo*);
+                                                         const std::vector<double>&, HijCacheT<std::array<uint64_t, 3>>&, bool, int, double, int, int, const std::vector<double>&, const IntegralSparsityInfo*, const std::string&);
 
 template std::vector<DeterminantT<uint64_t>> select_top_k_dets_t<uint64_t>(const std::vector<DeterminantT<uint64_t>>&, const std::vector<double>&, size_t, const std::vector<DeterminantT<uint64_t>>&, bool);
 template std::vector<DeterminantT<std::array<uint64_t, 2>>> select_top_k_dets_t<std::array<uint64_t, 2>>(const std::vector<DeterminantT<std::array<uint64_t, 2>>>&, const std::vector<double>&, size_t, const std::vector<DeterminantT<std::array<uint64_t, 2>>>&, bool);
@@ -601,17 +668,17 @@ template std::tuple<double, std::vector<DeterminantT<uint64_t>>, std::vector<dou
 run_trim_t<uint64_t>(const std::vector<DeterminantT<uint64_t>>&, const std::vector<std::vector<double>>&,
                      const std::vector<double>&, const std::string&, int, int,
                      const std::vector<int>&, const std::vector<int>&, bool, bool,
-                     const std::vector<DeterminantT<uint64_t>>&, double, int);
+                     const std::vector<DeterminantT<uint64_t>>&, double, int, const std::string&);
 template std::tuple<double, std::vector<DeterminantT<std::array<uint64_t, 2>>>, std::vector<double>>
 run_trim_t<std::array<uint64_t, 2>>(const std::vector<DeterminantT<std::array<uint64_t, 2>>>&, const std::vector<std::vector<double>>&,
                                     const std::vector<double>&, const std::string&, int, int,
                                     const std::vector<int>&, const std::vector<int>&, bool, bool,
-                                    const std::vector<DeterminantT<std::array<uint64_t, 2>>>&, double, int);
+                                    const std::vector<DeterminantT<std::array<uint64_t, 2>>>&, double, int, const std::string&);
 template std::tuple<double, std::vector<DeterminantT<std::array<uint64_t, 3>>>, std::vector<double>>
 run_trim_t<std::array<uint64_t, 3>>(const std::vector<DeterminantT<std::array<uint64_t, 3>>>&, const std::vector<std::vector<double>>&,
                                     const std::vector<double>&, const std::string&, int, int,
                                     const std::vector<int>&, const std::vector<int>&, bool, bool,
-                                    const std::vector<DeterminantT<std::array<uint64_t, 3>>>&, double, int);
+                                    const std::vector<DeterminantT<std::array<uint64_t, 3>>>&, double, int, const std::string&);
 
 template std::vector<std::vector<DeterminantT<std::array<uint64_t, 4>>>> partition_pool_t<std::array<uint64_t, 4>>(const std::vector<DeterminantT<std::array<uint64_t, 4>>>&, int);
 template std::vector<std::vector<DeterminantT<std::array<uint64_t, 5>>>> partition_pool_t<std::array<uint64_t, 5>>(const std::vector<DeterminantT<std::array<uint64_t, 5>>>&, int);
@@ -621,19 +688,19 @@ template std::vector<std::vector<DeterminantT<std::array<uint64_t, 8>>>> partiti
 
 template std::tuple<double, std::vector<double>>
 diagonalize_subspace_davidson_t<std::array<uint64_t, 4>>(const std::vector<DeterminantT<std::array<uint64_t, 4>>>&, const std::vector<std::vector<double>>&,
-                                                         const std::vector<double>&, HijCacheT<std::array<uint64_t, 4>>&, bool, int, double, int, int, const std::vector<double>&, const IntegralSparsityInfo*);
+                                                         const std::vector<double>&, HijCacheT<std::array<uint64_t, 4>>&, bool, int, double, int, int, const std::vector<double>&, const IntegralSparsityInfo*, const std::string&);
 template std::tuple<double, std::vector<double>>
 diagonalize_subspace_davidson_t<std::array<uint64_t, 5>>(const std::vector<DeterminantT<std::array<uint64_t, 5>>>&, const std::vector<std::vector<double>>&,
-                                                         const std::vector<double>&, HijCacheT<std::array<uint64_t, 5>>&, bool, int, double, int, int, const std::vector<double>&, const IntegralSparsityInfo*);
+                                                         const std::vector<double>&, HijCacheT<std::array<uint64_t, 5>>&, bool, int, double, int, int, const std::vector<double>&, const IntegralSparsityInfo*, const std::string&);
 template std::tuple<double, std::vector<double>>
 diagonalize_subspace_davidson_t<std::array<uint64_t, 6>>(const std::vector<DeterminantT<std::array<uint64_t, 6>>>&, const std::vector<std::vector<double>>&,
-                                                         const std::vector<double>&, HijCacheT<std::array<uint64_t, 6>>&, bool, int, double, int, int, const std::vector<double>&, const IntegralSparsityInfo*);
+                                                         const std::vector<double>&, HijCacheT<std::array<uint64_t, 6>>&, bool, int, double, int, int, const std::vector<double>&, const IntegralSparsityInfo*, const std::string&);
 template std::tuple<double, std::vector<double>>
 diagonalize_subspace_davidson_t<std::array<uint64_t, 7>>(const std::vector<DeterminantT<std::array<uint64_t, 7>>>&, const std::vector<std::vector<double>>&,
-                                                         const std::vector<double>&, HijCacheT<std::array<uint64_t, 7>>&, bool, int, double, int, int, const std::vector<double>&, const IntegralSparsityInfo*);
+                                                         const std::vector<double>&, HijCacheT<std::array<uint64_t, 7>>&, bool, int, double, int, int, const std::vector<double>&, const IntegralSparsityInfo*, const std::string&);
 template std::tuple<double, std::vector<double>>
 diagonalize_subspace_davidson_t<std::array<uint64_t, 8>>(const std::vector<DeterminantT<std::array<uint64_t, 8>>>&, const std::vector<std::vector<double>>&,
-                                                         const std::vector<double>&, HijCacheT<std::array<uint64_t, 8>>&, bool, int, double, int, int, const std::vector<double>&, const IntegralSparsityInfo*);
+                                                         const std::vector<double>&, HijCacheT<std::array<uint64_t, 8>>&, bool, int, double, int, int, const std::vector<double>&, const IntegralSparsityInfo*, const std::string&);
 
 template std::vector<DeterminantT<std::array<uint64_t, 4>>> select_top_k_dets_t<std::array<uint64_t, 4>>(const std::vector<DeterminantT<std::array<uint64_t, 4>>>&, const std::vector<double>&, size_t, const std::vector<DeterminantT<std::array<uint64_t, 4>>>&, bool);
 template std::vector<DeterminantT<std::array<uint64_t, 5>>> select_top_k_dets_t<std::array<uint64_t, 5>>(const std::vector<DeterminantT<std::array<uint64_t, 5>>>&, const std::vector<double>&, size_t, const std::vector<DeterminantT<std::array<uint64_t, 5>>>&, bool);
@@ -645,27 +712,27 @@ template std::tuple<double, std::vector<DeterminantT<std::array<uint64_t, 4>>>, 
 run_trim_t<std::array<uint64_t, 4>>(const std::vector<DeterminantT<std::array<uint64_t, 4>>>&, const std::vector<std::vector<double>>&,
                                     const std::vector<double>&, const std::string&, int, int,
                                     const std::vector<int>&, const std::vector<int>&, bool, bool,
-                                    const std::vector<DeterminantT<std::array<uint64_t, 4>>>&, double, int);
+                                    const std::vector<DeterminantT<std::array<uint64_t, 4>>>&, double, int, const std::string&);
 template std::tuple<double, std::vector<DeterminantT<std::array<uint64_t, 5>>>, std::vector<double>>
 run_trim_t<std::array<uint64_t, 5>>(const std::vector<DeterminantT<std::array<uint64_t, 5>>>&, const std::vector<std::vector<double>>&,
                                     const std::vector<double>&, const std::string&, int, int,
                                     const std::vector<int>&, const std::vector<int>&, bool, bool,
-                                    const std::vector<DeterminantT<std::array<uint64_t, 5>>>&, double, int);
+                                    const std::vector<DeterminantT<std::array<uint64_t, 5>>>&, double, int, const std::string&);
 template std::tuple<double, std::vector<DeterminantT<std::array<uint64_t, 6>>>, std::vector<double>>
 run_trim_t<std::array<uint64_t, 6>>(const std::vector<DeterminantT<std::array<uint64_t, 6>>>&, const std::vector<std::vector<double>>&,
                                     const std::vector<double>&, const std::string&, int, int,
                                     const std::vector<int>&, const std::vector<int>&, bool, bool,
-                                    const std::vector<DeterminantT<std::array<uint64_t, 6>>>&, double, int);
+                                    const std::vector<DeterminantT<std::array<uint64_t, 6>>>&, double, int, const std::string&);
 template std::tuple<double, std::vector<DeterminantT<std::array<uint64_t, 7>>>, std::vector<double>>
 run_trim_t<std::array<uint64_t, 7>>(const std::vector<DeterminantT<std::array<uint64_t, 7>>>&, const std::vector<std::vector<double>>&,
                                     const std::vector<double>&, const std::string&, int, int,
                                     const std::vector<int>&, const std::vector<int>&, bool, bool,
-                                    const std::vector<DeterminantT<std::array<uint64_t, 7>>>&, double, int);
+                                    const std::vector<DeterminantT<std::array<uint64_t, 7>>>&, double, int, const std::string&);
 template std::tuple<double, std::vector<DeterminantT<std::array<uint64_t, 8>>>, std::vector<double>>
 run_trim_t<std::array<uint64_t, 8>>(const std::vector<DeterminantT<std::array<uint64_t, 8>>>&, const std::vector<std::vector<double>>&,
                                     const std::vector<double>&, const std::string&, int, int,
                                     const std::vector<int>&, const std::vector<int>&, bool, bool,
-                                    const std::vector<DeterminantT<std::array<uint64_t, 8>>>&, double, int);
+                                    const std::vector<DeterminantT<std::array<uint64_t, 8>>>&, double, int, const std::string&);
 
 // =================================================================================
 // 5) transform_integrals

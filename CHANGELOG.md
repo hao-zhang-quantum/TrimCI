@@ -1,5 +1,8 @@
 # Changelog
 
+## [0.1.3] - 2026-04-17
+- Davidson initialization optimization and other minor improvements
+
 ## [0.1.2] - 2026-02-17
 - Iterative workflow upgraded to C++ backend (significant speedup)
 - Comprehensive refinements across the codebase

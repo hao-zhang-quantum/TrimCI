@@ -112,16 +112,18 @@ void bind_scalable_trim(py::module& m, const std::string& suffix) {
           py::arg("dets"), py::arg("h1"), py::arg("eri"), py::arg("cache"), py::arg("quantization"),
           py::arg("max_iter") = 100, py::arg("tol") = 1e-3, py::arg("verbosity") = 0, py::arg("n_orb") = 0,
           py::arg("initial_guess") = std::vector<double>{},
-          py::arg("sparsity") = nullptr);
+          py::arg("sparsity") = nullptr,
+          py::arg("init_strategy") = std::string("lowest_diag_noise"));
 
     m.def(("select_top_k_dets_" + suffix).c_str(), &select_top_k_dets_t<std::array<uint64_t, N>>,
           py::arg("dets"), py::arg("coeffs"), py::arg("k"), py::arg("core_set") = std::vector<DetType>{}, py::arg("keep_core") = true);
 
     m.def(("run_trim_" + suffix).c_str(), &run_trim_t<std::array<uint64_t, N>>,
           py::arg("pool"), py::arg("h1"), py::arg("eri"), py::arg("mol_name"), py::arg("n_elec"), py::arg("n_orb"),
-          py::arg("group_sizes"), py::arg("keep_sizes"), 
+          py::arg("group_sizes"), py::arg("keep_sizes"),
           py::arg("quantization") = false, py::arg("save_cache") = true,
-          py::arg("external_core_dets") = std::vector<DetType>{}, py::arg("tol") = 1e-3, py::arg("verbosity") = 1);
+          py::arg("external_core_dets") = std::vector<DetType>{}, py::arg("tol") = 1e-3, py::arg("verbosity") = 1,
+          py::arg("davidson_init") = std::string("lowest_diag_noise"));
 }
 
 template<size_t N>
@@ -404,15 +406,15 @@ void bind_trim(py::module& m) {
           py::arg("max_iter") = 100, py::arg("tol") = 1e-3,
           py::arg("verbosity") = 0, py::arg("n_orb") = 0,
           py::arg("initial_guess") = std::vector<double>{},
+          py::arg("init_strategy") = std::string("lowest_diag_noise"),
           py::call_guard<py::gil_scoped_release>());
 
     m.def("select_top_k_dets", &select_top_k_dets,
           py::arg("dets"), py::arg("coeffs"), py::arg("k"),
           py::arg("core_set") = std::vector<Determinant>{},
           py::arg("keep_core") = true);
-          
-    m.def("run_trim", 
-        // Wrapper for tuple return consistency
+
+    m.def("run_trim",
         [](const std::vector<Determinant>& pool,
            const std::vector<std::vector<double>>& h1,
            const std::vector<double>& eri,
@@ -422,17 +424,19 @@ void bind_trim(py::module& m) {
            const std::vector<int>& keep_sizes,
            bool quantization, bool save_cache,
            const std::vector<Determinant>& external_core_dets,
-           double tol, int verbosity) {
-               return run_trim(pool, h1, eri, mol_name, n_elec, n_orb, group_sizes, keep_sizes, quantization, save_cache, external_core_dets, tol, verbosity);
+           double tol, int verbosity,
+           const std::string& davidson_init) {
+               return run_trim(pool, h1, eri, mol_name, n_elec, n_orb, group_sizes, keep_sizes, quantization, save_cache, external_core_dets, tol, verbosity, davidson_init);
            },
           py::arg("pool"), py::arg("h1"), py::arg("eri"),
           py::arg("mol_name"), py::arg("n_elec"), py::arg("n_orb"),
-          py::arg("group_sizes"), 
+          py::arg("group_sizes"),
           py::arg("keep_sizes"),
           py::arg("quantization") = false, py::arg("save_cache") = true,
           py::arg("external_core_dets") = std::vector<Determinant>{},
-          py::arg("tol") = 1e-3, py::arg("verbosity") = 1);
-    
+          py::arg("tol") = 1e-3, py::arg("verbosity") = 1,
+          py::arg("davidson_init") = std::string("lowest_diag_noise"));
+
     // Aliases for 64-bit
     m.def("diagonalize_subspace_davidson_64", &diagonalize_subspace_davidson,
           py::arg("dets"), py::arg("h1"), py::arg("eri"),
@@ -440,6 +444,7 @@ void bind_trim(py::module& m) {
           py::arg("max_iter") = 100, py::arg("tol") = 1e-3,
           py::arg("verbosity") = 0, py::arg("n_orb") = 0,
           py::arg("initial_guess") = std::vector<double>{},
+          py::arg("init_strategy") = std::string("lowest_diag_noise"),
           py::call_guard<py::gil_scoped_release>());
 
     m.def("select_top_k_dets_64", &select_top_k_dets,
@@ -447,7 +452,7 @@ void bind_trim(py::module& m) {
           py::arg("core_set") = std::vector<Determinant>{},
           py::arg("keep_core") = true);
 
-    m.def("run_trim_64", 
+    m.def("run_trim_64",
         [](const std::vector<Determinant>& pool,
            const std::vector<std::vector<double>>& h1,
            const std::vector<double>& eri,
@@ -457,16 +462,18 @@ void bind_trim(py::module& m) {
            const std::vector<int>& keep_sizes,
            bool quantization, bool save_cache,
            const std::vector<Determinant>& external_core_dets,
-           double tol, int verbosity) {
-               return run_trim(pool, h1, eri, mol_name, n_elec, n_orb, group_sizes, keep_sizes, quantization, save_cache, external_core_dets, tol, verbosity);
+           double tol, int verbosity,
+           const std::string& davidson_init) {
+               return run_trim(pool, h1, eri, mol_name, n_elec, n_orb, group_sizes, keep_sizes, quantization, save_cache, external_core_dets, tol, verbosity, davidson_init);
            },
           py::arg("pool"), py::arg("h1"), py::arg("eri"),
           py::arg("mol_name"), py::arg("n_elec"), py::arg("n_orb"),
-          py::arg("group_sizes"), 
+          py::arg("group_sizes"),
           py::arg("keep_sizes"),
           py::arg("quantization") = false, py::arg("save_cache") = true,
           py::arg("external_core_dets") = std::vector<Determinant>{},
-          py::arg("tol") = 1e-3, py::arg("verbosity") = 1);
+          py::arg("tol") = 1e-3, py::arg("verbosity") = 1,
+          py::arg("davidson_init") = std::string("lowest_diag_noise"));
 
 
     // Scalable trim bindings
@@ -554,12 +561,14 @@ void bind_iterative_workflow(py::module& m) {
         .def_readwrite("pool_core_ratio", &IterativeWorkflowParams::pool_core_ratio)
         .def_readwrite("pool_build_strategy", &IterativeWorkflowParams::pool_build_strategy)
         .def_readwrite("threshold", &IterativeWorkflowParams::threshold)
+        .def_readwrite("first_cycle_threshold", &IterativeWorkflowParams::first_cycle_threshold)
         .def_readwrite("threshold_decay", &IterativeWorkflowParams::threshold_decay)
         .def_readwrite("max_rounds", &IterativeWorkflowParams::max_rounds)
         .def_readwrite("attentive_orbitals", &IterativeWorkflowParams::attentive_orbitals)
         .def_readwrite("strategy_factor", &IterativeWorkflowParams::strategy_factor)
         .def_readwrite("e0", &IterativeWorkflowParams::e0)
         .def_readwrite("pool_strict_target_size", &IterativeWorkflowParams::pool_strict_target_size)
+        .def_readwrite("max_pool_size", &IterativeWorkflowParams::max_pool_size)
         .def_readwrite("stagnation_limit", &IterativeWorkflowParams::stagnation_limit)
         .def_readwrite("noise_strength", &IterativeWorkflowParams::noise_strength)
         .def_readwrite("num_groups", &IterativeWorkflowParams::num_groups)
@@ -567,6 +576,7 @@ void bind_iterative_workflow(py::module& m) {
         .def_readwrite("local_trim_keep_ratio", &IterativeWorkflowParams::local_trim_keep_ratio)
         .def_readwrite("keep_ratio", &IterativeWorkflowParams::keep_ratio)
         .def_readwrite("verbosity", &IterativeWorkflowParams::verbosity)
+        .def_readwrite("davidson_init", &IterativeWorkflowParams::davidson_init)
         .def_readwrite("save_period", &IterativeWorkflowParams::save_period)
         .def_readwrite("save_pool", &IterativeWorkflowParams::save_pool)
         .def_readwrite("save_initial", &IterativeWorkflowParams::save_initial)

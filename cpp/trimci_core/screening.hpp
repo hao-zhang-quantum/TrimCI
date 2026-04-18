@@ -21,12 +21,19 @@ struct PoolBuildParams {
     int max_rounds = 2;           // rounds per threshold level
     double threshold_decay = 0.5; // threshold reduction factor
     double min_threshold = 1e-10; // minimum threshold
-    int max_stagnant_rounds = 1000; // max rounds without progress
+    int max_stagnant_rounds = 1000; // max consecutive threshold reductions without progress
     
     // Strategy factor: controls pre-filter size for PT2 modes
     // -1 = automatic (1 for heat_bath, 20 for PT2 modes)
     // User can override to any positive value
     int strategy_factor = -1;
+
+    // Mutual-information weights for "mi" screening mode.
+    // Flat n_orb × n_orb: mi_weights[p * mi_n_orb + q] = |C(p,q)|.
+    // Score = |H_ij * c_i| * (1 + mi_alpha * mi_weight(hole, particle)).
+    std::vector<double> mi_weights;
+    int mi_n_orb = 0;
+    double mi_alpha = 10.0;  // weight scaling factor
     
     // PT2 specific
     double pt2_denom_min = 1e-10; // minimum denominator to avoid intruder states
@@ -34,6 +41,18 @@ struct PoolBuildParams {
     // Strict target size: if true, truncate pool to exactly target_size
     // This gives better time control at the cost of potentially missing important dets
     bool strict_target_size = false;
+
+    // Early stop: if true, stop processing chunks as soon as pool >= target_size.
+    // If false, process all frontier chunks before truncation, giving a larger
+    // candidate pool and better strict truncation quality at the cost of more compute.
+    // Default true preserves original behavior.
+    bool early_stop = true;
+
+    // Max pool size: hard cap on pool_map size during merge.
+    // When pool_map reaches this size, stop merging new candidates.
+    // Candidates from high-weight parents (merged first) are kept.
+    // 0 = no limit (default).
+    int max_pool_size = 0;
 };
 
 // Screening mode (string-based for extensibility)
@@ -127,7 +146,7 @@ template<typename StorageType>
 std::pair<std::vector<DeterminantT<StorageType>>, double>
 pool_build_t(
     const std::vector<DeterminantT<StorageType>>& initial_pool,
-    const std::vector<double>& initial_coeff,
+    std::vector<double> initial_coeff,  // P8: by-value for post-loop release
     int n_orb,
     const std::vector<std::vector<double>>& h1,
     const std::vector<double>& eri,
@@ -137,7 +156,9 @@ pool_build_t(
     const std::string& cache_file,
     const std::vector<int>& attentive_orbitals,
     int verbosity,
-    const PoolBuildParams& params = {}
+    const PoolBuildParams& params = {},
+    const IntegralSparsityInfo* precomputed_sparsity = nullptr,
+    const DoubleExcTable* precomputed_table = nullptr
 );
 
 // Wrapper for backward compatibility

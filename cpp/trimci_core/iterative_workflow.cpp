@@ -258,11 +258,20 @@ IterativeWorkflowResult<BitType> iterative_workflow_t(
         pb_params.threshold_decay = threshold_decay;
         pb_params.strategy_factor = strategy_factor;
         pb_params.strict_target_size = params.pool_strict_target_size;
-        
+        pb_params.max_pool_size = params.max_pool_size;
+
+        // First-cycle threshold override
+        double effective_threshold = threshold;
+        if (iteration == 0 && params.first_cycle_threshold > 0) {
+            effective_threshold = params.first_cycle_threshold;
+            log_msg(verbosity, 1, "[C++] Using first_cycle_threshold=" +
+                    std::to_string(params.first_cycle_threshold) + " for iteration 1");
+        }
+
         // Call pool_build (stays in C++, no Python conversion!)
         auto pool_result = pool_build_t<BitType>(
             current_core_set, screening_coeffs, n_orb, h1, eri,
-            threshold, pool_size, cache, cache_file,
+            effective_threshold, pool_size, cache, cache_file,
             attentive_orbitals, verbosity, pb_params
         );
         
@@ -335,7 +344,8 @@ IterativeWorkflowResult<BitType> iterative_workflow_t(
             false,  // save_cache (we manage our own)
             current_core_set,  // external_core_dets
             1e-3,   // tol
-            verbosity
+            verbosity,
+            params.davidson_init
         );
         
         current_energy = std::get<0>(trim_result);
@@ -549,13 +559,15 @@ IterativeWorkflowResult<BitType> iterative_workflow_t(
     
     // Final Davidson diagonalization on core set (with warm start)
     auto final_diag = diagonalize_subspace_davidson_t<BitType>(
-        current_core_set, h1, eri, cache, 
+        current_core_set, h1, eri, cache,
         false,  // quantization
         500,    // max_iter
         1e-6,   // tol
         verbosity,
         n_orb,
-        current_core_coeffs  // warm start from previous coeffs
+        current_core_coeffs,  // warm start from previous coeffs
+        nullptr,  // sparsity
+        params.davidson_init
     );
     
     double final_core_energy = std::get<0>(final_diag) + nuclear_repulsion;
