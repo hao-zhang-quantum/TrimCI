@@ -188,20 +188,17 @@ def _get_time(result: dict) -> float:
 
 def _format_det(det) -> str:
     """Format a determinant as (alpha_bits, beta_bits) string."""
-    if isinstance(det, (list, tuple)) and len(det) == 2:
-        # det is (alpha, beta) pair
+    # C++ Determinant objects (Determinant64, Determinant128, etc.)
+    if hasattr(det, 'alpha') and hasattr(det, 'beta'):
+        alpha, beta = det.alpha, det.beta
+        if isinstance(alpha, list):
+            return f"({alpha}, {beta})"
+        return f"({bin(alpha)}, {bin(beta)})"
+    elif isinstance(det, (list, tuple)) and len(det) == 2:
         alpha, beta = det
-        # Convert to binary representation if they are integers
         if isinstance(alpha, int) and isinstance(beta, int):
             return f"({bin(alpha)}, {bin(beta)})"
-        else:
-            return f"({alpha}, {beta})"
-    elif hasattr(det, '__iter__'):
-        # det is array-like, just show first few elements
-        arr = list(det)[:4]
-        if len(list(det)) > 4:
-            return f"[{', '.join(map(str, arr))}, ...]"
-        return str(arr)
+        return f"({alpha}, {beta})"
     else:
         return str(det)
 

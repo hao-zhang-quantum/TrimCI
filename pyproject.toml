@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "trimci"
-version = "0.1.3"
+version = "0.2.0"
 authors = [
     {name = "Hao Zhang", email = "hao.zhang.quantum@gmail.com"},
 ]
@@ -62,4 +62,4 @@ tci = "trimci.TrimCI_runner.run_trimci:main"
 [tool.scikit-build]
 cmake.source-dir = "cpp/trimci_core"
 wheel.packages = ["py/trimci"]
-sdist.exclude = ["benchmark/**", "tutorial/**", "third_party/eigen/**", ".github/**"]
+sdist.exclude = ["benchmark/**", "tutorials/**", "third_party/eigen/**", ".github/**"]

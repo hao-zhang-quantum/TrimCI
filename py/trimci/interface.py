@@ -79,12 +79,12 @@ def screening(pool: List, initial_coeff: List, n_orb: int, h1, eri,
               max_rounds: int = 2, threshold_decay: float = 0.5,
               attentive_orbitals: Optional[List[int]] = None,
               verbosity: int = 1,
-              screening_mode: str = "heat_bath",
+              screening_mode: str = "hb",
               e0: float = 0.0,
               strategy_factor: int = -1):
     """
     Perform screening with automatic function selection.
-    
+
     Args:
         pool: Initial determinant pool
         initial_coeff: Initial coefficients
@@ -100,27 +100,25 @@ def screening(pool: List, initial_coeff: List, n_orb: int, h1, eri,
         attentive_orbitals: If provided, excitations are restricted to these orbital indices
                            (for Attentive TrimCI). Empty list or None means use all orbitals.
         verbosity: Verbosity level (0=silent, 1=basic, 2=detailed)
-        screening_mode: Screening strategy ("heat_bath", "heat_bath_pt2", "pt2")
-                       - "heat_bath": Use |H_ij * c_i| for screening (default, fast)
-                       - "heat_bath_pt2": Two-stage: heat_bath pre-filter, then PT2 score refinement
-                       - "pt2": Same as heat_bath_pt2 but with aggregation across parents
+        screening_mode: Screening strategy:
+                       - "hb" (default): heat-bath screening, rank by MAX(|H_ij*c_i|)
+                       - "hb-pt2": heat-bath screening + PT2 reranking
         e0: Current variational energy (required for PT2 modes)
         strategy_factor: Pre-filter multiplier for PT2 modes (-1=auto: 1 for heat_bath, 20 for PT2)
-        
     Returns:
         Tuple of (result_pool, final_threshold)
     """
     funcs = get_functions_for_system(n_orb)
-    
+
     # Flatten ERI if it's 4D
     if hasattr(eri, "reshape") and hasattr(eri, "ndim") and eri.ndim == 4:
         eri_flat = eri.reshape(-1)
     else:
         eri_flat = eri
-    
+
     # Convert None to empty list for C++
     att_orbs = attentive_orbitals if attentive_orbitals is not None else []
-    
+
     result_pool, final_threshold = funcs['pool_build'](pool, initial_coeff, n_orb, h1, eri_flat,
                                                       threshold, target_size, cache, cache_file,
                                                       max_rounds, threshold_decay, att_orbs, verbosity,

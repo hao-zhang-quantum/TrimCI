@@ -102,14 +102,59 @@ endif()
 
 # 4) Build Python extension
 pybind11_add_module(trimci_core
-    determinant.cpp
-    hamiltonian.cpp
-    iterative_workflow.cpp
-    screening.cpp
-    trim.cpp
-    davidson_gep.cpp
-    matfree_davidson.cpp
-    pybind_wrapper.cpp
+    # common/
+    common/determinant.cpp
+    common/hamiltonian.cpp
+    common/spin_operator.cpp
+    # trimci/
+    trimci/screening.cpp
+    trimci/trim.cpp
+    trimci/iterative_workflow.cpp
+    # solvers/
+    solvers/davidson_gep.cpp
+    solvers/matfree_davidson.cpp
+    solvers/direct_s_builder.cpp
+    solvers/direct_h_builder.cpp
+    solvers/direct_h_detspace.cpp
+    solvers/excitation_generator.cpp
+    # rdm/
+    rdm/rdm.cpp
+    rdm/rdm_low_order.cpp
+    rdm/rdm_3body.cpp
+    rdm/rdm_4body.cpp
+    rdm/rdm_4body_cumulant.cpp
+    rdm/rdm_5body.cpp
+    rdm/rdm_6body.cpp
+    rdm/rdm_transition.cpp
+    rdm/rdm_cumulant_element.cpp
+    # orbital_opt/
+    orbital_opt/orbital_opt.cpp
+    # fast_expansion/
+    fast_expansion/ab_index.cpp
+    fast_expansion/morton_sort.cpp
+    fast_expansion/ab_group_matvec.cpp
+    fast_expansion/detspace_matvec.cpp
+    fast_expansion/detspace_davidson.cpp
+    fast_expansion/sparse_update_davidson.cpp
+    fast_expansion/expansion_loop.cpp
+    fast_expansion/streaming_pt2.cpp
+    fast_expansion/enpt3.cpp
+    fast_expansion/dressed_ci.cpp
+    fast_expansion/dressed_ci_hybrid.cpp
+    fast_expansion/ab_group_matvec.cpp
+    fast_expansion/detspace_matvec_gpu.cpp  # GPU Davidson matvec (guarded by TRIMCI_HAS_GPU)
+    # davidson_utils/
+    davidson_utils/davidson_utils.cpp
+    # bindings (pybind11)
+    bindings/bind_common.cpp
+    bindings/bind_trimci.cpp
+    bindings/bind_rdm.cpp
+    bindings/bind_orbital_opt.cpp
+    bindings/bind_workflow.cpp
+    bindings/bind_solvers.cpp
+    bindings/bind_fast_expansion.cpp
+    bindings/bind_davidson_utils.cpp
+    module.cpp
 )
 
 # Optional: Build scalable determinant example (for testing)
@@ -122,6 +167,14 @@ endif()
 # 5) Include directories
 target_include_directories(trimci_core PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/trimci
+    ${CMAKE_CURRENT_SOURCE_DIR}/solvers
+    ${CMAKE_CURRENT_SOURCE_DIR}/rdm
+    ${CMAKE_CURRENT_SOURCE_DIR}/orbital_opt
+    ${CMAKE_CURRENT_SOURCE_DIR}/fast_expansion
+    ${CMAKE_CURRENT_SOURCE_DIR}/davidson_utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/bindings
     ${EIGEN3_INCLUDE_DIR}
 )
 
@@ -145,10 +198,31 @@ if(OpenMP_CXX_FOUND)
     target_link_libraries(trimci_core PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
+# 7.5) Architecture-specific optimizations
+# Use TRIMCI_MARCH to override -march (e.g. -DTRIMCI_MARCH=x86-64-v3 for portability).
+# Default: "native" (best performance on build host, but NOT portable across CPU types).
+set(TRIMCI_MARCH "native" CACHE STRING "Target -march for trimci_core (native, x86-64-v3, etc.)")
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag("-march=${TRIMCI_MARCH}" COMPILER_SUPPORTS_MARCH)
+if(COMPILER_SUPPORTS_MARCH)
+    target_compile_options(trimci_core PRIVATE -march=${TRIMCI_MARCH})
+    message(STATUS "Enabled -march=${TRIMCI_MARCH} for architecture optimizations")
+endif()
+
 # 8) Link third-party libraries
 target_link_libraries(trimci_core PRIVATE
     Eigen3::Eigen
 )
+
+# 8.5) Enable BLAS backend for Eigen on macOS (Apple Accelerate)
+if(APPLE)
+    find_library(ACCELERATE_FRAMEWORK Accelerate)
+    if(ACCELERATE_FRAMEWORK)
+        message(STATUS "Enabling Eigen BLAS backend with Apple Accelerate")
+        target_compile_definitions(trimci_core PRIVATE EIGEN_USE_BLAS)
+        target_link_libraries(trimci_core PRIVATE ${ACCELERATE_FRAMEWORK})
+    endif()
+endif()
 
 # 9) Install .so/.pyd into package directory
 install(TARGETS trimci_core DESTINATION trimci)

@@ -112,6 +112,9 @@ class DeterminantTypeSelector:
                 'diagonalize_subspace_davidson': trimci_core.diagonalize_subspace_davidson,
                 'select_top_k_dets': trimci_core.select_top_k_dets,
                 'run_trim': trimci_core.run_trim,
+                'compute_orbital_gradient': trimci_core.compute_orbital_gradient,
+                'orbital_approx_newton_optimize': trimci_core.orbital_approx_newton_optimize,
+                'orbital_bfgs_optimize': trimci_core.orbital_bfgs_optimize,
                 'type_suffix': ''
             }
         else:
@@ -129,6 +132,9 @@ class DeterminantTypeSelector:
                     'diagonalize_subspace_davidson': getattr(trimci_core, f'diagonalize_subspace_davidson{suffix}'),
                     'select_top_k_dets': getattr(trimci_core, f'select_top_k_dets{suffix}'),
                     'run_trim': getattr(trimci_core, f'run_trim{suffix}'),
+                    'compute_orbital_gradient': getattr(trimci_core, f'compute_orbital_gradient{suffix}'),
+                    'orbital_approx_newton_optimize': getattr(trimci_core, f'orbital_approx_newton_optimize{suffix}'),
+                    'orbital_bfgs_optimize': getattr(trimci_core, f'orbital_bfgs_optimize{suffix}'),
                     'type_suffix': suffix
                 }
             except AttributeError as e:
@@ -146,6 +152,9 @@ class DeterminantTypeSelector:
                     'diagonalize_subspace_davidson': trimci_core.diagonalize_subspace_davidson,
                     'select_top_k_dets': trimci_core.select_top_k_dets,
                     'run_trim': trimci_core.run_trim,
+                    'compute_orbital_gradient': trimci_core.compute_orbital_gradient,
+                    'orbital_approx_newton_optimize': trimci_core.orbital_approx_newton_optimize,
+                    'orbital_bfgs_optimize': trimci_core.orbital_bfgs_optimize,
                     'type_suffix': ''
                 }
     

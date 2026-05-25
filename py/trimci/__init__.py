@@ -54,7 +54,19 @@ from .auto_selector import (
     print_system_recommendation,
 )
 
-from .TrimCI_runner.trimci_driver import run_full_calculation, read_fcidump, run_full, run_auto
+from .TrimCI_runner.trimci_driver import run_full_calculation, run_full
+from .TrimCI_runner.io_utils import read_fcidump
+from .orblab import symmetrize_h1, symmetrize_eri, symmetrize_fcidump
+
+# Friendly API layer
+from .api import (
+    Config,
+    Result,
+    ground_state,
+    ground_state_from_fcidump,
+    ground_state_from_integrals,
+    ground_state_from_pyscf,
+)
 
 __all__ = [
     "extract_mol_name",
@@ -72,6 +84,16 @@ __all__ = [
     "get_system_info",
     "print_system_recommendation",
     "run_full_calculation",
-    "run_auto",
+    "run_full",
     "read_fcidump",
+    "symmetrize_h1",
+    "symmetrize_eri",
+    "symmetrize_fcidump",
+    # Friendly API
+    "Config",
+    "Result",
+    "ground_state",
+    "ground_state_from_fcidump",
+    "ground_state_from_integrals",
+    "ground_state_from_pyscf",
 ]

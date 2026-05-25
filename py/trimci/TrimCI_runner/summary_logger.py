@@ -135,6 +135,36 @@ class TrimCISummaryLogger:
         if results_dir:
             self.log(f"📁 Results saved to: {results_dir}")
     
+    def write_iteration_table(self, iteration_details: dict):
+        """Write per-iteration details table (from iterative workflow results)."""
+        iterations = iteration_details.get('iterations', [])
+        if not iterations:
+            return
+
+        self.log("")
+        self.log("Iteration Details:")
+        self.log(f"  {'Iter':<6} {'Core':<8} {'Pool':<10} {'Raw Dets':<10} {'Energy (Ha)':<18} {'dE':<12} {'Time (s)':<10}")
+        self.log("  " + "-" * 72)
+        for it in iterations:
+            idx = it.get('iteration', '?')
+            core = it.get('core_set_size_before', it.get('core_set_size', '-'))
+            pool = it.get('actual_pool_size', '-')
+            raw = it.get('raw_dets_count', '-')
+            energy = it.get('raw_energy', it.get('total_energy', None))
+            de = it.get('energy_change', None)
+            t = it.get('iteration_time', None)
+
+            e_str = f"{energy:<18.8f}" if isinstance(energy, float) else f"{energy!s:<18}"
+            de_str = f"{de:<12.2e}" if isinstance(de, float) else f"{de!s:<12}"
+            t_str = f"{t:<10.2f}" if isinstance(t, (int, float)) else f"{t!s:<10}"
+
+            self.log(f"  {idx:<6} {core:<8} {pool:<10} {raw:<10} {e_str} {de_str} {t_str}")
+
+        e_nuclear = iteration_details.get('nuclear_repulsion', 0)
+        e_final = iteration_details.get('final_energy', None)
+        if e_final is not None and e_nuclear:
+            self.log(f"  Electronic Energy: {e_final - e_nuclear:.10f} Ha")
+
     def write_multi_summary(self, all_results: list, best: dict, total_time: float):
         """Write summary for multi-run mode (sequential)."""
         self.log("")

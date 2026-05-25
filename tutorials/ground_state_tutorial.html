@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TrimCI · ground_state Tutorial</title>
+<style>
+  :root {
+    --coral:   #E63946;
+    --teal:    #2A9D8F;
+    --ocean:   #1D6FB8;
+    --amber:   #F4A261;
+    --amethyst:#8E44AD;
+    --rose:    #E91E63;
+    --charcoal:#2B2B2B;
+    --gray:    #555555;
+    --silver:  #BFBFBF;
+    --paper:   #FAFAF7;
+    --blush:   #FFE5EA;
+    --ice:     #D7F0EC;
+    --grid:    #E0E0E0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
+                 "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--charcoal);
+    background: var(--paper);
+    line-height: 1.65;
+    margin: 0;
+    padding: 0;
+    font-size: 15px;
+  }
+
+  /* Top-right control cluster: lang dropdown + export button */
+  .top-controls {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 1000;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .lang-select {
+    background: white;
+    border: 1.5px solid var(--coral);
+    color: var(--coral);
+    padding: 6px 30px 6px 14px;
+    border-radius: 18px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23E63946' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+  }
+  .lang-select:hover { background-color: var(--blush); }
+  .lang-select:focus {
+    outline: none;
+    border-color: var(--coral);
+    box-shadow: 0 2px 6px rgba(230,57,70,0.18);
+  }
+  .lang-select option { background: white; color: var(--charcoal); font-weight: 500; }
+
+  .export-btn {
+    background: white;
+    border: 1.5px solid var(--teal);
+    color: var(--teal);
+    padding: 6px 14px;
+    border-radius: 18px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    transition: background 0.15s, color 0.15s;
+  }
+  .export-btn:hover { background: var(--teal); color: white; }
+  .export-btn:focus { outline: none; box-shadow: 0 2px 6px rgba(42,157,143,0.25); }
+
+  /* Toast notification */
+  .toast {
+    position: fixed;
+    top: 70px;
+    right: 18px;
+    z-index: 1001;
+    background: var(--teal);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 14px;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Language visibility rules */
+  body.lang-en .txt-zh { display: none; }
+  body.lang-zh .txt-en { display: none; }
+
+  .container {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  header {
+    border-bottom: 2px solid var(--coral);
+    padding-bottom: 24px;
+    margin-bottom: 40px;
+  }
+  h1 {
+    font-size: 32px;
+    font-weight: 700;
+    margin: 0 0 8px;
+    letter-spacing: -0.5px;
+  }
+  h1 .accent {
+    color: var(--coral);
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 28px;
+  }
+  .tagline {
+    color: var(--gray);
+    font-size: 16px;
+    margin: 0;
+  }
+  h2 {
+    color: var(--ocean);
+    font-size: 22px;
+    margin: 48px 0 16px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--grid);
+  }
+  h3 {
+    color: var(--charcoal);
+    font-size: 17px;
+    margin: 28px 0 12px;
+  }
+  p { margin: 12px 0; }
+  ul, ol { padding-left: 22px; margin: 12px 0; }
+  li { margin: 4px 0; }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, "Courier New", monospace;
+    font-size: 13.5px;
+    background: var(--blush);
+    color: var(--coral);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+  pre {
+    background: #f5f3ee;
+    border-left: 3px solid var(--teal);
+    padding: 14px 18px;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 16px 0;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  pre code {
+    background: none;
+    color: var(--charcoal);
+    padding: 0;
+    font-size: 13px;
+  }
+  .pre-note {
+    color: var(--gray);
+    font-size: 12px;
+    margin-bottom: -10px;
+    margin-top: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0;
+    font-size: 13.5px;
+  }
+  th, td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--grid);
+  }
+  th {
+    background: var(--ice);
+    font-weight: 600;
+    color: var(--charcoal);
+  }
+  tr:hover { background: rgba(232,233,234,0.3); }
+  td.right { text-align: right; font-family: "SF Mono", Menlo, monospace; }
+  .callout {
+    background: var(--blush);
+    border-left: 3px solid var(--coral);
+    padding: 14px 18px;
+    border-radius: 4px;
+    margin: 20px 0;
+    font-size: 14px;
+  }
+  .callout.teal {
+    background: var(--ice);
+    border-left-color: var(--teal);
+  }
+  .callout.amber {
+    background: #FFF4E5;
+    border-left-color: var(--amber);
+  }
+  .callout-label {
+    font-weight: 600;
+    color: var(--coral);
+    margin-right: 4px;
+  }
+  .callout.teal .callout-label { color: var(--teal); }
+  .callout.amber .callout-label { color: var(--amber); }
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .tag.recommended { background: var(--teal); color: white; }
+  .tag.advanced    { background: var(--amber); color: white; }
+  .tag.warning     { background: var(--coral); color: white; }
+  .params-grid {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    gap: 16px 24px;
+    margin: 16px 0;
+    align-items: start;
+  }
+  .params-grid .key {
+    font-family: "SF Mono", Menlo, monospace;
+    color: var(--coral);
+    font-size: 14px;
+    font-weight: 600;
+    background: var(--blush);
+    padding: 4px 8px;
+    border-radius: 3px;
+    text-align: center;
+  }
+  .toc {
+    background: var(--paper);
+    border: 1px solid var(--grid);
+    border-radius: 6px;
+    padding: 16px 24px;
+    margin: 24px 0 40px;
+  }
+  .toc h4 {
+    margin: 0 0 8px;
+    color: var(--gray);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-weight: 600;
+  }
+  .toc ol {
+    list-style: none;
+    counter-reset: tocnum;
+    padding-left: 0;
+    margin: 0;
+    columns: 2;
+    column-gap: 32px;
+  }
+  .toc li {
+    counter-increment: tocnum;
+    margin: 4px 0;
+    font-size: 14px;
+  }
+  .toc li::before {
+    content: counter(tocnum, decimal-leading-zero) "  ";
+    color: var(--coral);
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px;
+  }
+  .toc a {
+    color: var(--charcoal);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--silver);
+  }
+  .toc a:hover { color: var(--coral); border-bottom-color: var(--coral); }
+  .decision-tree {
+    background: white;
+    border: 1px solid var(--grid);
+    border-radius: 6px;
+    padding: 20px 24px;
+    margin: 20px 0;
+  }
+  .branch {
+    margin: 14px 0;
+    padding-left: 24px;
+    border-left: 2px solid var(--teal);
+  }
+  .branch.amber { border-left-color: var(--amber); }
+  .branch.coral { border-left-color: var(--coral); }
+  .branch-head {
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .footer {
+    margin-top: 60px;
+    padding-top: 24px;
+    border-top: 1px solid var(--grid);
+    color: var(--gray);
+    font-size: 12px;
+  }
+  .footer code {
+    background: none;
+    color: var(--gray);
+    padding: 0;
+  }
+  .kw     { color: var(--ocean);   }
+  .fn     { color: var(--amethyst);}
+  .str    { color: var(--teal);    }
+  .num    { color: var(--amber);   }
+  .cmt    { color: var(--gray); font-style: italic; }
+</style>
+</head>
+<body class="lang-en">
+
+<div class="top-controls">
+  <select class="lang-select" id="lang-select" onchange="setLang(this.value)" aria-label="Language">
+    <option value="en">English</option>
+    <option value="zh">中文</option>
+  </select>
+  <button class="export-btn" id="export-btn" onclick="exportMarkdown()" title="Copy as Markdown (paste-ready for AI / chat / notes)">
+    <span class="txt-en">Copy MD</span><span class="txt-zh">导出 MD</span>
+  </button>
+</div>
+<div class="toast" id="toast"></div>
+
+<div class="container">
+
+<header>
+  <h1>
+    <span class="accent">trimci.ground_state</span>
+    <span class="txt-en">Tutorial</span><span class="txt-zh">新手教程</span>
+  </h1>
+  <p class="tagline">
+    <span class="txt-en">Three parameters, from molecular integrals to a converged ground-state energy.</span>
+    <span class="txt-zh">三个参数，从分子积分到收敛的量子化学基态能量</span>
+  </p>
+</header>
+
+<div class="toc">
+  <h4><span class="txt-en">Contents</span><span class="txt-zh">目录</span></h4>
+  <ol>
+    <li><a href="#quickstart"><span class="txt-en">30-second quick start</span><span class="txt-zh">30 秒速通</span></a></li>
+    <li><a href="#three-params"><span class="txt-en">The three parameters</span><span class="txt-zh">三个参数详解</span></a></li>
+    <li><a href="#recipes"><span class="txt-en">Recipe table (pick by accuracy)</span><span class="txt-zh">配方表（按精度选）</span></a></li>
+    <li><a href="#result"><span class="txt-en">The Result object</span><span class="txt-zh">Result 对象</span></a></li>
+    <li><a href="#inputs"><span class="txt-en">Three input modes</span><span class="txt-zh">三种输入方式</span></a></li>
+    <li><a href="#save"><span class="txt-en">Save / load results</span><span class="txt-zh">保存 / 读取结果</span></a></li>
+    <li><a href="#decision"><span class="txt-en">Decision tree</span><span class="txt-zh">决策树</span></a></li>
+    <li><a href="#advanced"><span class="txt-en">Advanced — full Config control</span><span class="txt-zh">高级 — Config 全量控制</span></a></li>
+    <li><a href="#pitfalls"><span class="txt-en">Common questions & pitfalls</span><span class="txt-zh">常见问题与陷阱</span></a></li>
+  </ol>
+</div>
+
+<section id="quickstart">
+<h2>
+  <span class="txt-en">1. 30-second quick start</span>
+  <span class="txt-zh">1. 30 秒速通</span>
+</h2>
+
+<p>
+  <span class="txt-en">Have a FCIDUMP file? Three lines:</span>
+  <span class="txt-zh">有 FCIDUMP 文件？三行代码：</span>
+</p>
+
+<p class="pre-note">Python</p>
+<pre><code><span class="kw">import</span> trimci
+
+result = trimci.<span class="fn">ground_state</span>(<span class="str">"FCIDUMP"</span>)
+<span class="fn">print</span>(result.energy)        <span class="cmt"># variational energy (Ha)</span>
+<span class="fn">print</span>(result.energy_pt2)    <span class="cmt"># + PT2 correction</span></code></pre>
+
+<p>
+  <span class="txt-en">No FCIDUMP, just <code>h1</code> and <code>eri</code> arrays? Also three lines:</span>
+  <span class="txt-zh">没有 FCIDUMP，只有 <code>h1</code>、<code>eri</code> 数组？也三行：</span>
+</p>
+
+<p class="pre-note">Python</p>
+<pre><code>result = trimci.<span class="fn">ground_state</span>((h1, eri, n_elec))
+<span class="fn">print</span>(result.<span class="fn">summary</span>())</code></pre>
+
+<div class="callout teal">
+  <span class="callout-label"><span class="txt-en">What's happening underneath?</span><span class="txt-zh">底层在做什么？</span></span>
+  <span class="txt-en">Internally runs a 3-phase workflow automatically: Phase 0 TrimCI Core Search + orbital optimization → Phase 1 expansion + orbopt refinement → Phase 2 final expansion + PT2. All parameters have sensible defaults.</span>
+  <span class="txt-zh">自动跑 3 阶段 workflow：Phase 0 TrimCI Core Search + 轨道优化 → Phase 1 expansion + orbopt refinement → Phase 2 final expansion + PT2。所有参数都有合理默认值。</span>
+</div>
+</section>
+
+<section id="three-params">
+<h2>
+  <span class="txt-en">2. The three parameters</span>
+  <span class="txt-zh">2. 三个参数详解</span>
+</h2>
+
+<div class="params-grid">
+  <div class="key">problem</div>
+  <div>
+    <strong><span class="txt-en">Problem input.</span><span class="txt-zh">问题输入</span></strong>
+    <span class="txt-en"> Supports four forms:</span><span class="txt-zh">。支持四种形式：</span>
+    <ul>
+      <li><span class="txt-en">FCIDUMP file path (string) — most common; spin read from the file's <code>MS2</code> header</span><span class="txt-zh">FCIDUMP 文件路径（字符串）— 最常用；自旋由文件 <code>MS2</code> 字段决定</span></li>
+      <li><span class="txt-en"><code>(h1, eri, n_elec)</code> tuple — pass spin via <code>ms2</code>; e_nuc defaults to 0</span><span class="txt-zh"><code>(h1, eri, n_elec)</code> 元组 — 用 <code>ms2</code> 指定自旋；e_nuc 默认 0</span></li>
+      <li><span class="txt-en"><code>(h1, eri, n_elec, e_nuc)</code> tuple — fully specified, <code>ms2</code> kwarg sets spin</span><span class="txt-zh"><code>(h1, eri, n_elec, e_nuc)</code> 元组 — 完整指定，<code>ms2</code> kwarg 设自旋</span></li>
+      <li><span class="txt-en">PySCF mean-field object — spin taken from <code>mf.mol.spin</code>; pass <code>active=(n_e, n_o)</code> for an active space</span><span class="txt-zh">PySCF mean-field 对象 — 自旋取自 <code>mf.mol.spin</code>；用 <code>active=(n_e, n_o)</code> 指定活性空间</span></li>
+    </ul>
+    <em><span class="txt-en">Open-shell is fully supported across all input modes.</span><span class="txt-zh">所有输入模式都支持开壳层。</span></em>
+  </div>
+
+  <div class="key">n_dets</div>
+  <div>
+    <strong><span class="txt-en">Target determinant count.</span><span class="txt-zh">目标 determinant 数</span></strong>
+    <span class="txt-en"> Determines final accuracy — larger is more accurate. Internally split on a log scale into Phase 0/1/2 caps (e.g. <code>n_dets=10⁸</code> → <code>1k / 1M / 10⁸</code>).</span>
+    <span class="txt-zh">。决定最终精度 — 越大越准。内部按 log scale 自动切成 Phase 0/1/2 三段（例如 <code>n_dets=10⁸</code> 切成 <code>1k / 1M / 10⁸</code>）。</span>
+    <ul>
+      <li><span class="txt-en">Default <code>100_000</code></span><span class="txt-zh">默认 <code>100_000</code></span></li>
+      <li><span class="txt-en">Wall scales logarithmically with n_dets</span><span class="txt-zh">越大越接近 FCI，wall 时间随 n_dets log 增长</span></li>
+    </ul>
+  </div>
+
+  <div class="key">effort</div>
+  <div>
+    <strong><span class="txt-en">Workload multiplier</span><span class="txt-zh">工作量倍数</span></strong>
+    <span class="txt-en">, controlling Phase 0 stochastic exploration intensity.</span>
+    <span class="txt-zh">，控制 Phase 0 的 stochastic 探索强度。</span>
+    <ul>
+      <li><span class="txt-en"><code>effort=0.4</code> is the sweet spot — leave it alone (based on Fe<sub>4</sub>S<sub>4</sub> measurements)</span><span class="txt-zh"><code>effort=0.4</code> 是 sweet spot — 不用调（基于 Fe<sub>4</sub>S<sub>4</sub> 实测）</span></li>
+      <li><span class="txt-en"><code>effort=1.0</code> matches <code>TrimCI_skill</code> defaults (num_runs=64, BFGS=50 iter)</span><span class="txt-zh"><code>effort=1.0</code> 对齐 <code>TrimCI_skill</code> 默认（num_runs=64, BFGS=50 iter）</span></li>
+      <li><span class="txt-en"><code>effort=0.05</code> for a quick smoke test</span><span class="txt-zh"><code>effort=0.05</code> 快速 smoke test</span></li>
+    </ul>
+    <em><span class="txt-en">Scaling: <code>num_runs ≈ 64×effort</code> (BFGS maxiter fixed at 100 — exits early when converged).</span><span class="txt-zh">具体 scaling: <code>num_runs ≈ 64×effort</code>（BFGS maxiter 固定 100，收敛即提早退出）。</span></em>
+  </div>
+</div>
+
+<h3>
+  <span class="txt-en">Optional kwargs</span>
+  <span class="txt-zh">可选参数</span>
+</h3>
+
+<div class="params-grid">
+  <div class="key">ms2</div>
+  <div>
+    <strong><span class="txt-en">2·S_z = n_alpha - n_beta</span><span class="txt-zh">2·S_z = n_α - n_β</span></strong>.
+    <span class="txt-en">Default 0 (closed-shell singlet). For the <code>(h1, eri, n_elec)</code> path: pass <code>ms2=1</code> for doublet, <code>ms2=2</code> for triplet, etc. For FCIDUMP path: the file's MS2 field is authoritative (passing <code>ms2</code> here warns and is ignored).</span>
+    <span class="txt-zh">默认 0（闭壳层单重态）。<code>(h1, eri, n_elec)</code> 路径：<code>ms2=1</code> doublet，<code>ms2=2</code> triplet 等。FCIDUMP 路径：以文件 MS2 字段为准（此 kwarg 会被忽略并 warn）。</span>
+  </div>
+</div>
+
+<div class="callout amber">
+  <span class="callout-label"><span class="txt-en">Key insight</span><span class="txt-zh">关键经验</span></span>
+  <span class="txt-en">Measurements show <strong>n_dets is the dominant axis</strong>; effort is secondary. <code>effort=0.4</code> is already good enough; for higher accuracy, scale <code>n_dets</code>, not effort. If your <code>n_dets</code> request exceeds the Hilbert dim, it's auto-clamped (see <code>res.diagnostics.n_fci</code>).</span>
+  <span class="txt-zh">实测发现 <strong>n_dets 是主导轴</strong>，effort 次之。<code>effort=0.4</code> 已经够好；要更高精度优先扩 <code>n_dets</code>，不是堆 effort。<code>n_dets</code> 超 Hilbert 维度时自动 clamp（查 <code>res.diagnostics.n_fci</code>）。</span>
+</div>
+</section>
+
+<section id="recipes">
+<h2>
+  <span class="txt-en">3. Recipe table</span>
+  <span class="txt-zh">3. 配方表</span>
+  <span class="tag recommended"><span class="txt-en">measured on Fe<sub>4</sub>S<sub>4</sub> (54e, 36o)</span><span class="txt-zh">Fe<sub>4</sub>S<sub>4</sub> (54e, 36o) 实测</span></span>
+</h2>
+
+<p>
+  <span class="txt-en">Values below come from a 9-point n_dets sweep on a 32-core x86 node (effort=0.4 fixed). Wall times will scale with your hardware.</span>
+  <span class="txt-zh">下面这张表来自跨 9 个 n_dets 的实测扫描，跑在 32 核 x86 节点上（effort=0.4 固定）。不同硬件 wall 时间会不同。</span>
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th><span class="txt-en">Goal</span><span class="txt-zh">目标</span></th>
+      <th><span class="txt-en">Call</span><span class="txt-zh">调用</span></th>
+      <th><span class="txt-en">Expected E_PT2 (Ha)</span><span class="txt-zh">期望 E_PT2 (Ha)</span></th>
+      <th><span class="txt-en">Typical wall</span><span class="txt-zh">典型 wall</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="txt-en">Smoke test (just confirm it runs)</span><span class="txt-zh">烟雾测试（确认能跑）</span></td>
+      <td><code>ground_state(p, n_dets=100, effort=0.05)</code></td>
+      <td>-327.17</td>
+      <td>~2 min</td>
+    </tr>
+    <tr>
+      <td><span class="txt-en">Quick estimate</span><span class="txt-zh">快速估算</span></td>
+      <td><code>ground_state(p, n_dets=3000)</code></td>
+      <td>-327.18</td>
+      <td>~4 min</td>
+    </tr>
+    <tr>
+      <td><span class="txt-en">Balanced accuracy/cost</span><span class="txt-zh">平衡精度/成本</span><span class="tag recommended"><span class="txt-en">recommended</span><span class="txt-zh">推荐</span></span></td>
+      <td><code>ground_state(p, n_dets=100_000)</code></td>
+      <td>-327.224</td>
+      <td>~5 min</td>
+    </tr>
+    <tr>
+      <td><span class="txt-en">High accuracy</span><span class="txt-zh">高精度</span></td>
+      <td><code>ground_state(p, n_dets=1_000_000)</code></td>
+      <td>-327.231</td>
+      <td>~10 min</td>
+    </tr>
+    <tr>
+      <td><span class="txt-en">Larger scale</span><span class="txt-zh">更大规模</span></td>
+      <td><code>ground_state(p, n_dets=3_000_000)</code></td>
+      <td>-327.235</td>
+      <td>~16 min</td>
+    </tr>
+  </tbody>
+</table>
+
+</section>
+
+<section id="result">
+<h2>
+  <span class="txt-en">4. The Result object — how to extract data</span>
+  <span class="txt-zh">4. Result 对象 — 怎么取数据</span>
+</h2>
+
+<p>
+  <span class="txt-en">The returned <code>Result</code> has three layers. The 5 most commonly used fields are at the top:</span>
+  <span class="txt-zh">返回的 <code>Result</code> 分三层。最常用的字段在顶层（5 个）：</span>
+</p>
+
+<p class="pre-note">Top-level shortcuts</p>
+<pre><code>res = trimci.<span class="fn">ground_state</span>(<span class="str">"FCIDUMP"</span>)
+
+res.energy          <span class="cmt"># float — variational total energy (Ha)</span>
+res.energy_pt2      <span class="cmt"># float | None — variational + PT2</span>
+res.n_dets          <span class="cmt"># int   — final det count</span>
+res.wall_time       <span class="cmt"># float — total wall (seconds)</span></code></pre>
+
+<p>
+  <span class="txt-en">To judge whether the result is "converged enough" for your purpose, look at:</span>
+  <span class="txt-zh">想判断结果是不是"够收敛"，看：</span>
+</p>
+<ul>
+  <li><code>res.energies.pt2_correction</code> — <span class="txt-en">small (e.g. &lt; 1 mHa) ⇒ variational space is saturated</span><span class="txt-zh">很小（&lt; 1 mHa）⇒ variational 空间足够</span></li>
+  <li><code>res.energies.history[-3:]</code> — <span class="txt-en">last few rounds flat ⇒ converged plateau</span><span class="txt-zh">末几轮平 ⇒ 收敛平台</span></li>
+  <li><code>res.n_dets == res.diagnostics.n_fci</code> — <span class="txt-en">expansion reached the Hilbert dim ⇒ exact (FCI)</span><span class="txt-zh">达到 Hilbert 维度 ⇒ FCI 精确</span></li>
+</ul>
+
+<h3>
+  <span class="txt-en">Sub-objects: <code>.energies</code> / <code>.wavefunction</code> / <code>.diagnostics</code></span>
+  <span class="txt-zh">子对象：<code>.energies</code> / <code>.wavefunction</code> / <code>.diagnostics</code></span>
+</h3>
+
+<p class="pre-note"><span class="txt-en">Energies — energy decomposition</span><span class="txt-zh">Energies — 能量分解</span></p>
+<pre><code>res.energies.var               <span class="cmt"># variational energy</span>
+res.energies.pt2_correction    <span class="cmt"># ΔE_PT2 (≤ 0)</span>
+res.energies.nuclear           <span class="cmt"># nuclear repulsion</span>
+res.energies.electronic        <span class="cmt"># = var - nuclear</span>
+res.energies.history           <span class="cmt"># energy trajectory across all rounds [list]</span>
+res.energies.pt2_history       <span class="cmt"># per-round ΔPT2 [list]</span></code></pre>
+
+<p class="pre-note">Wavefunction</p>
+<pre><code>wf = res.wavefunction
+
+wf.coeffs          <span class="cmt"># (N,) ndarray — amplitudes</span>
+wf.dets            <span class="cmt"># (N, 2K) ndarray — α+β bitstrings stacked</span>
+wf.alpha_bits      <span class="cmt"># (N, K) uint64</span>
+wf.beta_bits       <span class="cmt"># (N, K) uint64</span>
+wf.n_orb
+wf.is_normalized   <span class="cmt"># normalization check</span>
+
+<span class="cmt"># advanced extraction</span>
+wf.<span class="fn">leading</span>(<span class="num">5</span>)    <span class="cmt"># top-5 dets: [(α_bits, β_bits, c), ...]</span>
+wf.<span class="fn">occupation_numbers</span>()  <span class="cmt"># per-orbital occupation (n_orb, 2) [α, β]</span>
+
+<span class="cmt"># dict-like access (backward compat)</span>
+wf[<span class="str">"110011|110011"</span>]   <span class="cmt"># lookup amplitude by bitstring</span>
+<span class="kw">for</span> bits, c <span class="kw">in</span> wf.<span class="fn">items</span>():
+    ...</code></pre>
+
+<p class="pre-note"><span class="txt-en">Diagnostics — performance / Hilbert dim / config</span><span class="txt-zh">Diagnostics — 性能 / Hilbert 维度 / 配置</span></p>
+<pre><code>d = res.diagnostics
+
+d.wall_phase0       <span class="cmt"># Phase 0 (orbopt) time</span>
+d.wall_expansion    <span class="cmt"># Phase 1+2 expansion time</span>
+d.n_dets_phase0     <span class="cmt"># det count after Phase 0</span>
+d.n_dets_final      <span class="cmt"># final det count</span>
+d.expansion_rounds  <span class="cmt"># total Phase 1+2 rounds</span>
+d.n_fci             <span class="cmt"># full Hilbert dim = C(n_orb, n_α)·C(n_orb, n_β)</span>
+                    <span class="cmt"># requested n_dets is auto-clamped to this</span>
+d.orbopt_dir        <span class="cmt"># Phase 0 orbopt npz dir (or None)</span>
+d.checkpoint_dir    <span class="cmt"># Phase 1+2 checkpoint dir (or None)</span>
+d.config            <span class="cmt"># the Config dataclass used for this run</span></code></pre>
+
+<h3>
+  <span class="txt-en">Final rotated orbitals (lazy, loaded from disk)</span>
+  <span class="txt-zh">最终旋转后的轨道（lazy 从磁盘加载）</span>
+</h3>
+<pre><code><span class="cmt"># Integrals in the FINAL basis (after both Phase 0 and Phase 1 orbopt):</span>
+res.final_h1            <span class="cmt"># (n_orb, n_orb)</span>
+res.final_eri           <span class="cmt"># (n_orb, n_orb, n_orb, n_orb)</span>
+
+<span class="cmt"># Cumulative rotation: C_final = C_input @ U</span>
+res.orbital_rotation    <span class="cmt"># (n_orb, n_orb) orthogonal matrix</span>
+
+<span class="cmt"># Sanity check: U^T · h1_input · U should equal final_h1</span>
+<span class="kw">assert</span> np.<span class="fn">allclose</span>(
+    res.orbital_rotation.T @ h1_input @ res.orbital_rotation,
+    res.final_h1,
+)</code></pre>
+
+<p class="pre-note"><span class="txt-en">Human-readable summary</span><span class="txt-zh">人类可读 summary</span></p>
+<pre><code><span class="fn">print</span>(res.<span class="fn">summary</span>())
+
+<span class="cmt"># Output (example):
+# TrimCI Calculation Summary
+#   Energy (var):     -327.1937 Ha
+#   Energy (PT2):     -327.1957 Ha  (ΔPT2 = -0.002)
+#   Determinants:     800  (Phase 0: 100)
+#   Wall (Phase 0):   3.1 min
+#   Wall (Expansion): 0.7 min  (12 rounds)
+#   Wall (total):     3.8 min</span></code></pre>
+</section>
+
+<section id="inputs">
+<h2>
+  <span class="txt-en">5. Three input modes</span>
+  <span class="txt-zh">5. 三种输入方式</span>
+</h2>
+
+<h3><span class="txt-en">Mode A: FCIDUMP file (most common)</span><span class="txt-zh">方式 A: FCIDUMP 文件（最常用）</span></h3>
+<pre><code>res = trimci.<span class="fn">ground_state</span>(<span class="str">"path/to/FCIDUMP"</span>, n_dets=<span class="num">100000</span>)</code></pre>
+
+<h3><span class="txt-en">Mode B: <code>(h1, eri, n_elec)</code> tuple</span><span class="txt-zh">方式 B: <code>(h1, eri, n_elec)</code> 元组</span></h3>
+<pre><code><span class="kw">import</span> numpy <span class="kw">as</span> np
+
+<span class="cmt"># 4-site Hubbard ring, U=4, t=1</span>
+n = <span class="num">4</span>
+h1 = np.<span class="fn">zeros</span>((n, n))
+eri = np.<span class="fn">zeros</span>((n, n, n, n))
+<span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(n):
+    j = (i + <span class="num">1</span>) % n
+    h1[i, j] = h1[j, i] = -<span class="num">1.0</span>
+    eri[i, i, i, i] = <span class="num">4.0</span>
+
+res = trimci.<span class="fn">ground_state</span>((h1, eri, <span class="num">4</span>), n_dets=<span class="num">30</span>)
+<span class="cmt"># E_var = -2.1027484 Ha — matches exact FCI</span>
+
+<span class="cmt"># Open-shell: pass ms2 = 2·S_z = n_alpha - n_beta</span>
+res = trimci.<span class="fn">ground_state</span>((h1, eri, <span class="num">3</span>), ms2=<span class="num">1</span>)   <span class="cmt"># doublet</span>
+res = trimci.<span class="fn">ground_state</span>((h1, eri, <span class="num">4</span>), ms2=<span class="num">2</span>)   <span class="cmt"># triplet</span></code></pre>
+
+<p>
+  <span class="txt-en">The 4-tuple form <code>(h1, eri, n_elec, e_nuc)</code> lets you specify nuclear repulsion explicitly.</span>
+  <span class="txt-zh">四元组形式 <code>(h1, eri, n_elec, e_nuc)</code> 让你显式指定核排斥。</span>
+</p>
+
+<h3><span class="txt-en">Mode C: PySCF mean-field (a converged mf object)</span><span class="txt-zh">方式 C: PySCF mean-field（已收敛的 mf 对象）</span></h3>
+<pre><code><span class="kw">from</span> pyscf <span class="kw">import</span> gto, scf
+
+mol = gto.<span class="fn">M</span>(atom=<span class="str">"N 0 0 0; N 0 0 1.1"</span>, basis=<span class="str">"sto-3g"</span>)
+mf = scf.<span class="fn">RHF</span>(mol).<span class="fn">run</span>()
+
+<span class="cmt"># Unified entry — same as Mode A/B</span>
+res = trimci.<span class="fn">ground_state</span>(mf, n_dets=<span class="num">10000</span>)
+
+<span class="cmt"># For an active space: pass active=(n_e, n_o)</span>
+<span class="cmt"># res = trimci.ground_state(mf, n_dets=10000, active=(8, 8))</span></code></pre>
+</section>
+
+<section id="save">
+<h2>
+  <span class="txt-en">6. Save / load results</span>
+  <span class="txt-zh">6. 保存 / 读取结果</span>
+</h2>
+
+<p>
+  <span class="txt-en">For large-n_dets calculations, <strong>save your results</strong>. Default is NPZ (compressed binary):</span>
+  <span class="txt-zh">大 n_dets 跑出来的结果，<strong>务必存盘</strong>。默认 NPZ 格式（压缩二进制）：</span>
+</p>
+
+<pre><code>res.<span class="fn">save</span>(<span class="str">"my_calc.npz"</span>)         <span class="cmt"># NPZ — recommended</span>
+res.<span class="fn">save</span>(<span class="str">"my_calc"</span>)             <span class="cmt"># auto-appends .npz</span>
+res.<span class="fn">save</span>(<span class="str">"my_calc.json"</span>)        <span class="cmt"># JSON — only for small n_dets / debug</span>
+
+<span class="cmt"># load back</span>
+res2 = trimci.Result.<span class="fn">load</span>(<span class="str">"my_calc.npz"</span>)
+<span class="fn">print</span>(res2.energy)               <span class="cmt"># exact round-trip across processes</span></code></pre>
+
+<div class="callout teal">
+  <span class="callout-label"><span class="txt-en">Why NPZ?</span><span class="txt-zh">为什么 NPZ？</span></span>
+  <span class="txt-en">N=1M dets in JSON ≈ 100 MB; in NPZ+zlib ≈ 5-15 MB (8-20× smaller), and dtypes like <code>uint64</code>/<code>complex128</code> are preserved exactly. Always use NPZ unless you need to read it by eye.</span>
+  <span class="txt-zh">N=1M dets 的 JSON 大约 100 MB，NPZ + zlib 压缩约 5-15 MB（缩 8-20×），还保留 <code>uint64</code>/<code>complex128</code> 等 dtype。除非要肉眼检视，都用 NPZ。</span>
+</div>
+</section>
+
+<section id="decision">
+<h2>
+  <span class="txt-en">7. Decision tree: tune for your scenario</span>
+  <span class="txt-zh">7. 决策树：我的场景该怎么调</span>
+</h2>
+
+<div class="decision-tree">
+
+<div class="branch">
+  <div class="branch-head">
+    <span class="txt-en">Just want to confirm TrimCI runs (don't care about energy)</span>
+    <span class="txt-zh">想确认 TrimCI 能跑（不在乎能量）</span>
+  </div>
+  <pre><code>trimci.<span class="fn">ground_state</span>(p, n_dets=<span class="num">100</span>, effort=<span class="num">0.05</span>)
+<span class="cmt"># ~2 min, absolute value off by ~100 mHa, but you'll know if import + workflow are healthy</span></code></pre>
+</div>
+
+<div class="branch">
+  <div class="branch-head">
+    <span class="txt-en">Small molecule (n_orb ≤ 10) for benchmarking</span>
+    <span class="txt-zh">小分子（n_orb ≤ 10）做基准</span>
+  </div>
+  <pre><code>trimci.<span class="fn">ground_state</span>(p, n_dets=<span class="num">10_000</span>)
+<span class="cmt"># Usually nails FCI. Cross-check with pyscf FCI: diff &lt; 0.1 mHa</span></code></pre>
+</div>
+
+<div class="branch">
+  <div class="branch-head">
+    <span class="txt-en">Mid-size system (n_orb ~ 30), production answer</span>
+    <span class="txt-zh">中等体系（n_orb ~ 30）想 production 答案</span>
+  </div>
+  <pre><code>trimci.<span class="fn">ground_state</span>(p, n_dets=<span class="num">100_000</span>)
+<span class="cmt"># Fe4S4: -327.224 Ha in 5 min, ~7 mHa above theoretical limit</span></code></pre>
+</div>
+
+<div class="branch coral">
+  <div class="branch-head">
+    <span class="txt-en">Pursuing high accuracy</span>
+    <span class="txt-zh">追求高精度</span>
+  </div>
+  <pre><code>trimci.<span class="fn">ground_state</span>(p, n_dets=<span class="num">1_000_000</span>)
+<span class="cmt"># Fe4S4 single run: ~-327.23 Ha in ~10 min</span>
+<span class="cmt"># For tighter bounds, run multiple seeds and take the best/mean.</span></code></pre>
+</div>
+
+<div class="branch amber">
+  <div class="branch-head">
+    <span class="txt-en">Strongly correlated (stretched bonds, transition-metal clusters)</span>
+    <span class="txt-zh">极强关联（拉伸键、过渡金属簇等）</span>
+  </div>
+  <pre><code>trimci.<span class="fn">ground_state</span>(p, n_dets=<span class="num">3_000_000</span>)
+<span class="cmt"># Measured: N2 r=2.5 Å (823 mHa correlation) → FCI at n=2000</span>
+<span class="cmt"># Fe4S4-scale clusters: 1M-3M recommended</span></code></pre>
+</div>
+
+<div class="branch">
+  <div class="branch-head">
+    <span class="txt-en">Tight wall budget on a laptop</span>
+    <span class="txt-zh">本地 wall 紧（笔记本跑）</span>
+  </div>
+  <ul>
+    <li><span class="txt-en">Drop <code>n_dets</code> to the 10k-100k range; leave effort alone</span><span class="txt-zh">降 <code>n_dets</code> 到 10k-100k 区间，effort 不动</span></li>
+    <li><span class="txt-en">Don't push effort below 0.05 — Phase 0 becomes too weak, orbitals inaccurate</span><span class="txt-zh">不要降 effort 到 0.05 — Phase 0 太弱 orbital 不准</span></li>
+  </ul>
+</div>
+
+</div>
+</section>
+
+<section id="advanced">
+<h2>
+  <span class="txt-en">8. Advanced — full Config control</span>
+  <span class="txt-zh">8. 高级 — Config 全量控制</span>
+  <span class="tag advanced">advanced</span>
+</h2>
+
+<p>
+  <span class="txt-en">When 3 parameters aren't enough, construct a <code>Config</code> and pass it via the <code>config=</code> kwarg of <code>ground_state</code>:</span>
+  <span class="txt-zh">当三参数不够用时，构造 <code>Config</code> 对象，通过 <code>ground_state</code> 的 <code>config=</code> 关键字传入：</span>
+</p>
+
+<pre><code><span class="kw">from</span> trimci <span class="kw">import</span> Config
+
+cfg = <span class="fn">Config</span>(
+    <span class="cmt"># Phase 0</span>
+    num_runs=<span class="num">128</span>,
+    orbopt_cycles=<span class="num">8</span>,
+    orbopt=<span class="kw">True</span>,
+    max_dets_phase0=<span class="num">500</span>,
+    tracking_dets=<span class="kw">True</span>,
+    loaded_dets_randomness=<span class="num">0.1</span>,
+    <span class="cmt"># Phase 1 (orbopt + expansion)</span>
+    max_dets_phase1=<span class="num">100_000</span>,
+    growth_factor_phase1=<span class="num">1.1</span>,
+    orbopt_phase1=<span class="kw">True</span>,
+    use_connection_cache_phase1=<span class="kw">True</span>,
+    <span class="cmt"># Phase 2 (final expansion)</span>
+    max_dets_phase2=<span class="num">1_000_000</span>,
+    growth_factor_phase2=<span class="num">2.0</span>,
+    pt2_correction=<span class="kw">True</span>,
+    pt2_only_last=<span class="kw">True</span>,   <span class="cmt"># PT2 only at the final round; saves time</span>
+    <span class="cmt"># Reproducibility (None = fresh entropy per call; int = deterministic)</span>
+    seed=<span class="num">42</span>,
+    <span class="cmt"># Performance</span>
+    n_cpu_workers=<span class="num">8</span>,           <span class="cmt"># Phase 0 parallel subprocesses</span>
+    n_gpu_workers=<span class="num">0</span>,
+    backend_phase1=<span class="str">"cpu"</span>,     <span class="cmt"># or "gpu", "auto"</span>
+    <span class="cmt"># Advanced PT2 override</span>
+    phase2_overrides={<span class="str">"pt2"</span>: {<span class="str">"sketch_width"</span>: <span class="num">500_000</span>}},
+)
+
+<span class="cmt"># config= works with any input type:</span>
+res = trimci.<span class="fn">ground_state</span>(<span class="str">"FCIDUMP"</span>, config=cfg)
+res = trimci.<span class="fn">ground_state</span>((h1, eri, <span class="num">14</span>, <span class="num">0.0</span>), config=cfg)
+res = trimci.<span class="fn">ground_state</span>(mf, config=cfg)</code></pre>
+
+<div class="callout teal">
+  <span class="callout-label"><span class="txt-en">n_fci auto-clamp</span><span class="txt-zh">n_fci 自动 clamp</span></span>
+  <span class="txt-en">If the requested <code>n_dets</code> exceeds the Hilbert dim <code>C(n_orb, n_α) × C(n_orb, n_β)</code>, the Phase 0/1/2 caps are silently right-sized at the dispatcher (no warning needed — full FCI is the correct ceiling). Available as <code>res.diagnostics.n_fci</code>.</span>
+  <span class="txt-zh">用户请求的 <code>n_dets</code> 超过 Hilbert 维度 <code>C(n_orb, n_α) × C(n_orb, n_β)</code> 时，dispatcher 静默把 Phase 0/1/2 caps 切到正确大小（不警告 — full FCI 本来就是天花板）。值在 <code>res.diagnostics.n_fci</code>。</span>
+</div>
+
+<div class="callout teal">
+  <span class="callout-label"><span class="txt-en">Reproducibility via seed</span><span class="txt-zh">用 seed 复现</span></span>
+  <span class="txt-en"><code>Config(seed=42)</code> drives Phase 0 TrimCI Core Search + PT2 sketches + loaded-det random walks from a master seed. Same seed → bitwise-identical Result (modulo OMP non-determinism, ~1e-12 Ha). Default <code>seed=None</code> draws fresh entropy on each call.</span>
+  <span class="txt-zh"><code>Config(seed=42)</code> 用 master seed 驱动 Phase 0 TrimCI Core Search + PT2 sketch + 继承 det 的 random walk。相同 seed → bitwise 一致 Result（除 OMP 非确定性的 ~1e-12 Ha 抖动）。默认 <code>seed=None</code> 每次取新熵。</span>
+</div>
+
+<h3>
+  <span class="txt-en">Default values (auto-applied by <code>ground_state</code>)</span>
+  <span class="txt-zh">默认参数（<code>ground_state</code> 自动用）</span>
+</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th><span class="txt-en">Parameter</span><span class="txt-zh">参数</span></th>
+      <th><span class="txt-en">Default</span><span class="txt-zh">默认值</span></th>
+      <th><span class="txt-en">Meaning</span><span class="txt-zh">含义</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>orbopt_cycles</code></td>
+      <td><span class="txt-en">5 (fixed)</span><span class="txt-zh">5 固定</span></td>
+      <td><span class="txt-en">Phase 0 orbital optimization passes.</span><span class="txt-zh">Phase 0 轨道优化轮数</span></td>
+    </tr>
+    <tr>
+      <td><code>tracking_dets</code></td>
+      <td>True</td>
+      <td><span class="txt-en">Carry dets between cycles instead of fresh random restarts.</span><span class="txt-zh">cycle 间继承 dets，不每次随机重启</span></td>
+    </tr>
+    <tr>
+      <td><code>loaded_dets_randomness</code></td>
+      <td>0.1</td>
+      <td><span class="txt-en">~5 random single-excitations on carried dets to avoid basin lock-in.</span><span class="txt-zh">继承的 det 上做 ~5 步随机激发，避免 basin 锁死</span></td>
+    </tr>
+    <tr>
+      <td><code>pt2_only_last</code></td>
+      <td>True</td>
+      <td><span class="txt-en">Skip per-round PT2 during Phase 2 expansion; evaluate only at final det count.</span><span class="txt-zh">Phase 2 expansion 不做 per-round PT2，只在最终评估</span></td>
+    </tr>
+    <tr>
+      <td><code>num_runs</code></td>
+      <td><span class="txt-en">round(64 × effort)</span></td>
+      <td><span class="txt-en">Phase 0 stochastic exploration count.</span><span class="txt-zh">Phase 0 stochastic 探索次数</span></td>
+    </tr>
+    <tr>
+      <td><code>orbopt_max_iter</code></td>
+      <td><span class="txt-en">100 (fixed)</span><span class="txt-zh">100 (固定)</span></td>
+      <td><span class="txt-en">Phase 1 BFGS step cap. Exits early when converged — cap rarely binds.</span><span class="txt-zh">Phase 1 BFGS 单 cycle 上限。收敛即提早退出，cap 几乎不触底</span></td>
+    </tr>
+    <tr>
+      <td><code>seed</code></td>
+      <td>None</td>
+      <td><span class="txt-en">None ⇒ fresh entropy. Set int for reproducible runs / multi-seed variance studies.</span><span class="txt-zh">None ⇒ 每次新随机。设 int 用于复现 / multi-seed 方差研究</span></td>
+    </tr>
+  </tbody>
+</table>
+</section>
+
+<section id="pitfalls">
+<h2>
+  <span class="txt-en">9. Common questions and pitfalls</span>
+  <span class="txt-zh">9. 常见问题与陷阱</span>
+</h2>
+
+<h3>
+  <span class="txt-en">Q: Energy isn't monotonic; higher effort gives worse results</span>
+  <span class="txt-zh">问题：能量没收敛单调，effort 越高反而越差</span>
+</h3>
+<p>
+  <span class="txt-en">The variance of a single stochastic realization can exceed the expected gap between different effort levels. Pass <code>config=Config(seed=42, ...)</code> to <code>ground_state</code> to make a run reproducible, then sweep seeds to estimate variance. Or just <strong>scale up n_dets</strong> instead of pushing effort.</span>
+  <span class="txt-zh">原因：单次 stochastic 实现的方差大于不同 effort 之间的期望差。给 <code>ground_state</code> 传 <code>config=Config(seed=42, ...)</code> 可复现一次运行；扫多个 seed 可估方差。或者直接<strong>扩 n_dets</strong> 而不是堆 effort。</span>
+</p>
+
+<h3>
+  <span class="txt-en">Q: I bumped n_dets but the wall barely grew</span>
+  <span class="txt-zh">问题：n_dets 设很大但 wall 没怎么涨</span>
+</h3>
+<p>
+  <span class="txt-en">This is <strong>expected</strong>. Phase 0 (orbital optimization) dominates wall time and barely scales with n_dets; Phase 1+2 expansion is relatively cheap under the default settings.</span>
+  <span class="txt-zh">这是<strong>正常现象</strong>。Phase 0（轨道优化）是主要 wall 来源，几乎不随 n_dets 变化；Phase 1+2 expansion 在默认配置下成本相对较低。</span>
+</p>
+
+<h3>
+  <span class="txt-en">Q: <code>res.energy_pt2 is None</code></span>
+  <span class="txt-zh">问题：<code>res.energy_pt2 is None</code></span>
+</h3>
+<p>
+  <span class="txt-en">Either <code>pt2_correction</code> is disabled, or n_dets has covered the full Hilbert space (FCI-saturated — no external dets for PT2 to add). Read <code>res.energy</code> directly.</span>
+  <span class="txt-zh">说明 <code>pt2_correction</code> 被关了，或者 n_dets 已经覆盖了完整 Hilbert 空间（FCI saturated，PT2 没有外部 det 可加）。看 <code>res.energy</code>。</span>
+</p>
+
+<h3>
+  <span class="txt-en">Q: Does n_orb &gt; 64 cause problems?</span>
+  <span class="txt-zh">问题：n_orb &gt; 64 是不是有问题</span>
+</h3>
+<p>
+  <span class="txt-en">No. <code>Wavefunction.alpha_bits</code> has shape <code>(N, K)</code> where K = <code>ceil(n_orb / 64)</code> uint64 segments. All API surfaces (<code>leading()</code>, <code>to_dict()</code>, save/load) handle multi-segment dets correctly.</span>
+  <span class="txt-zh">没问题。<code>Wavefunction.alpha_bits</code> 是 <code>(N, K)</code> 形状，K = <code>ceil(n_orb / 64)</code> 个 uint64 segments。所有 API（<code>leading()</code>、<code>to_dict()</code>、save/load）都正确处理多 segment。</span>
+</p>
+
+<h3>
+  <span class="txt-en">Q: Error <code>PySCF is required to write FCIDUMP</code></span>
+  <span class="txt-zh">问题：报错 <code>PySCF is required to write FCIDUMP</code></span>
+</h3>
+<p>
+  <span class="txt-en">The <code>(h1, eri)</code> tuple path calls <code>pyscf.tools.fcidump.from_integrals</code> under the hood. Either install PySCF or pre-write the FCIDUMP file yourself and pass the path.</span>
+  <span class="txt-zh">用 <code>(h1, eri)</code> 元组路径会调用 <code>pyscf.tools.fcidump.from_integrals</code>。装 PySCF 或者自己用 FCIDUMP 文件路径替代。</span>
+</p>
+
+<h3>
+  <span class="txt-en">Q: How do I run open-shell (spin ≠ 0)?</span>
+  <span class="txt-zh">问题：开壳层（spin ≠ 0）怎么跑</span>
+</h3>
+<p>
+  <span class="txt-en">Three options, depending on input form:</span>
+  <span class="txt-zh">视输入形式，三种方式：</span>
+</p>
+<ul>
+  <li><span class="txt-en"><strong>FCIDUMP path</strong> — spin is read from the file's <code>MS2</code> header (just make sure your FCIDUMP writer set it correctly).</span><span class="txt-zh"><strong>FCIDUMP 路径</strong> — 自旋从文件 <code>MS2</code> 字段读取（确保 FCIDUMP 写出时设对了）。</span></li>
+  <li><span class="txt-en"><strong>Integrals tuple</strong> — pass the <code>ms2</code> kwarg: <code>ground_state((h1, eri, n_elec), n_dets=..., ms2=2)</code> for a triplet, <code>ms2=1</code> for a doublet, etc.</span><span class="txt-zh"><strong>积分元组</strong> — 传 <code>ms2</code> 关键字：三态 <code>ground_state((h1, eri, n_elec), n_dets=..., ms2=2)</code>，二态 <code>ms2=1</code>，依此类推。</span></li>
+  <li><span class="txt-en"><strong>PySCF mf</strong> — spin is taken from <code>mf.mol.spin</code> automatically (e.g. <code>gto.M(..., spin=2)</code> + <code>scf.ROHF</code>/<code>UHF</code>).</span><span class="txt-zh"><strong>PySCF mf</strong> — 自旋自动取自 <code>mf.mol.spin</code>（用 <code>gto.M(..., spin=2)</code> + <code>scf.ROHF</code>/<code>UHF</code>）。</span></li>
+</ul>
+
+<h3>
+  <span class="txt-en">Q: Five minutes in and no energy printed</span>
+  <span class="txt-zh">问题：跑了 5 分钟还没出能量</span>
+</h3>
+<p>
+  <span class="txt-en">Check stdout for Phase 0 progress before <code>res.diagnostics</code> — Phase 0 prints continuously. If stuck in Cycle 1, <code>orbopt_max_iter</code> may be too high or the system is hard to converge. Try <code>effort=0.05</code> first to confirm the workflow runs.</span>
+  <span class="txt-zh">查 <code>res.diagnostics</code> 之前先看 stdout — Phase 0 会 print progress。若卡在 Phase 0 cycle 1，可能是 <code>orbopt_max_iter</code> 太大 / 体系难收敛。试 <code>effort=0.05</code> 先验证 workflow 通。</span>
+</p>
+</section>
+
+
+</div>
+
+<script>
+function setLang(lang) {
+  const body = document.body;
+  const select = document.getElementById('lang-select');
+  if (lang === 'zh') {
+    body.classList.remove('lang-en');
+    body.classList.add('lang-zh');
+    document.documentElement.lang = 'zh-CN';
+    document.title = 'TrimCI · ground_state 新手教程';
+  } else {
+    body.classList.remove('lang-zh');
+    body.classList.add('lang-en');
+    document.documentElement.lang = 'en';
+    document.title = 'TrimCI · ground_state Tutorial';
+  }
+  if (select && select.value !== lang) select.value = lang;
+  try { localStorage.setItem('trimci-tutorial-lang', lang); } catch(e) {}
+}
+
+// Restore preference on load, default English
+(function() {
+  let lang = 'en';
+  try {
+    const saved = localStorage.getItem('trimci-tutorial-lang');
+    if (saved === 'zh' || saved === 'en') lang = saved;
+  } catch(e) {}
+  setLang(lang);
+})();
+
+/* ============================================================
+   Markdown export — walks the DOM (filtered to current
+   language), produces a paste-ready markdown string, copies
+   to clipboard. Designed for paste into AI chats, Slack,
+   Notion, GitHub issues, etc.
+   ============================================================ */
+function showToast(msg, kind) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = (kind === 'err') ? 'var(--coral)' : 'var(--teal)';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+function isHiddenByLang(el) {
+  // Skip elements that are display:none due to language toggle
+  const cs = window.getComputedStyle(el);
+  return cs.display === 'none';
+}
+
+function inlineToMd(el) {
+  // Convert an inline-level element's content to a markdown string
+  let out = '';
+  el.childNodes.forEach(n => {
+    if (n.nodeType === Node.TEXT_NODE) {
+      out += n.textContent;
+    } else if (n.nodeType === Node.ELEMENT_NODE) {
+      if (isHiddenByLang(n)) return;
+      const tag = n.tagName.toLowerCase();
+      if (tag === 'code') {
+        out += '`' + n.textContent + '`';
+      } else if (tag === 'strong' || tag === 'b') {
+        out += '**' + inlineToMd(n) + '**';
+      } else if (tag === 'em' || tag === 'i') {
+        out += '*' + inlineToMd(n) + '*';
+      } else if (tag === 'a') {
+        const href = n.getAttribute('href') || '';
+        out += '[' + inlineToMd(n) + '](' + href + ')';
+      } else if (tag === 'br') {
+        out += '\n';
+      } else if (tag === 'sub') {
+        out += '_' + n.textContent + '_';   // markdown-ish subscript
+      } else if (tag === 'sup') {
+        out += '^' + n.textContent + '^';
+      } else {
+        out += inlineToMd(n);
+      }
+    }
+  });
+  return out.replace(/[ \t]+/g, ' ').replace(/[ \t]*\n[ \t]*/g, '\n').trim();
+}
+
+function tableToMd(table) {
+  const rows = [];
+  const headerRow = table.querySelector('thead tr');
+  let header = [];
+  if (headerRow) {
+    header = Array.from(headerRow.querySelectorAll('th')).map(c => inlineToMd(c) || ' ');
+  } else {
+    const firstRow = table.querySelector('tr');
+    if (firstRow) header = Array.from(firstRow.querySelectorAll('th,td')).map(c => inlineToMd(c) || ' ');
+  }
+  rows.push('| ' + header.join(' | ') + ' |');
+  rows.push('|' + header.map(() => '---').join('|') + '|');
+  const bodyRows = table.querySelectorAll('tbody tr');
+  bodyRows.forEach(tr => {
+    const cells = Array.from(tr.querySelectorAll('td,th')).map(c => inlineToMd(c).replace(/\|/g, '\\|') || ' ');
+    rows.push('| ' + cells.join(' | ') + ' |');
+  });
+  return rows.join('\n');
+}
+
+function blockToMd(el, depth = 0) {
+  if (isHiddenByLang(el)) return '';
+  const tag = el.tagName ? el.tagName.toLowerCase() : '';
+  if (!tag) return '';
+
+  if (tag === 'h1') return '# ' + inlineToMd(el);
+  if (tag === 'h2') return '## ' + inlineToMd(el);
+  if (tag === 'h3') return '### ' + inlineToMd(el);
+  if (tag === 'h4') return '#### ' + inlineToMd(el);
+  if (tag === 'p')  return inlineToMd(el);
+  if (tag === 'pre') {
+    const code = el.querySelector('code');
+    const text = code ? code.textContent : el.textContent;
+    return '```python\n' + text.trim() + '\n```';
+  }
+  if (tag === 'ul' || tag === 'ol') {
+    const items = Array.from(el.children).filter(c => c.tagName.toLowerCase() === 'li');
+    return items.map((li, i) => {
+      const prefix = tag === 'ol' ? `${i + 1}. ` : '- ';
+      return prefix + inlineToMd(li);
+    }).join('\n');
+  }
+  if (tag === 'table') return tableToMd(el);
+  if (tag === 'header') {
+    // Render header (h1 + tagline)
+    let out = [];
+    Array.from(el.children).forEach(c => {
+      const m = blockToMd(c, depth + 1);
+      if (m) out.push(m);
+    });
+    return out.join('\n\n');
+  }
+  if (tag === 'section' || tag === 'div') {
+    let out = [];
+    Array.from(el.children).forEach(c => {
+      const m = blockToMd(c, depth + 1);
+      if (m) out.push(m);
+    });
+    return out.join('\n\n');
+  }
+  // Default: recurse children
+  let out = [];
+  Array.from(el.children).forEach(c => {
+    const m = blockToMd(c, depth + 1);
+    if (m) out.push(m);
+  });
+  return out.join('\n\n');
+}
+
+function buildMarkdown() {
+  // Skip the top-controls and toast
+  const container = document.querySelector('.container');
+  if (!container) return '';
+  let parts = [];
+  // Add a small header about the source
+  const lang = document.body.classList.contains('lang-zh') ? 'zh' : 'en';
+  const banner = lang === 'zh'
+    ? '<!-- trimci.ground_state tutorial — markdown export, 中文 -->'
+    : '<!-- trimci.ground_state tutorial — markdown export, English -->';
+  parts.push(banner);
+
+  Array.from(container.children).forEach(c => {
+    if (c.classList.contains('top-controls') || c.classList.contains('toast')) return;
+    const m = blockToMd(c);
+    if (m) parts.push(m);
+  });
+  // Clean: collapse 3+ newlines to 2
+  return parts.join('\n\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+}
+
+function exportMarkdown() {
+  const md = buildMarkdown();
+  const onCopied = () => {
+    const isZh = document.body.classList.contains('lang-zh');
+    showToast(isZh ? '已复制到剪贴板' : 'Copied to clipboard');
+  };
+  const onFail = () => {
+    const isZh = document.body.classList.contains('lang-zh');
+    showToast(isZh ? '复制失败，已下载为文件' : 'Copy failed; downloaded as file', 'err');
+    // Fallback: download
+    const blob = new Blob([md], {type: 'text/markdown'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ground_state_tutorial.md';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(md).then(onCopied, onFail);
+  } else {
+    // Old-browser fallback: use a textarea
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      onCopied();
+    } catch(e) {
+      onFail();
+    }
+  }
+}
+</script>
+
+</body>
+</html>

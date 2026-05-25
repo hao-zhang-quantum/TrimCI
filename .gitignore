@@ -1,7 +1,8 @@
 # Python build artifacts
 /dist/
 /build/
-/tests/
+tests/
+scripts/
 # /benchmark/
 /*.egg-info/
 **/__pycache__/
@@ -18,10 +19,20 @@ py/*.whl
 py/*.tar.gz
 
 # CMake/Ninja build dirs if created locally
-cpp/trimci_core/build/out
+cpp/trimci_core/build/
+
+# Runtime config and results
+trimci_config.json
+trimci_single_run_results/
 
 # Experimental code
 cpp/trimci_core/experimental/
+
+# Benchmarks, docs, experiments (dev-only, not tracked)
+benchmarks/
+doc/
+docs/
+experiments/
 
 # Tutorial
 tutorial/
@@ -29,3 +40,18 @@ tutorial/
 # Parallel runner test results
 trimci_parallel_results/
 realtime_progress.out
+
+# IDE / editor
+.vscode/
+
+# Packaging staging and tarballs at repo root
+_pack/
+/*.tar.gz
+
+# Entry-script run outputs
+py/trimci/entry/output_v2/
+
+# Source backups
+**/*_backup.hpp
+**/*_backup.cpp
+**/*_backup.py
