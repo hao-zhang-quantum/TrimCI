@@ -8,10 +8,7 @@
 
 #include "bit_compat.hpp"
 
-#ifdef _OPENMP
 #include "omp_compat.hpp"
-#endif
-
 namespace trimci_core {
 
 // ── Excitation type IDs (matching Python convention) ──

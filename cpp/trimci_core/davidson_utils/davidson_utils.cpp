@@ -16,9 +16,7 @@
 
 #include "../fast_expansion/fe_types.hpp"  // SplitMix64Hash, fe_map, fe_set
 
-#ifdef _OPENMP
 #include "omp_compat.hpp"
-#endif
 #include "../common/parallel_sort.hpp"
 
 namespace trimci_core {

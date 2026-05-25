@@ -10,10 +10,7 @@
 #include <chrono>
 #include <algorithm>
 
-#ifdef _OPENMP
 #include "omp_compat.hpp"
-#endif
-
 namespace trimci_core {
 namespace fe {
 

@@ -20,10 +20,7 @@
 #include <stdexcept>
 #include <cstdio>
 
-#ifdef _OPENMP
 #include "omp_compat.hpp"
-#endif
-
 namespace trimci_core {
 
 struct DavidsonGEPMVResult {

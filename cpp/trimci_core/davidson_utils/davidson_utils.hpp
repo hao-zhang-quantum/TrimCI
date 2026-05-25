@@ -15,10 +15,7 @@
 #include <vector>
 #include <cmath>
 
-#ifdef _OPENMP
 #include "omp_compat.hpp"
-#endif
-
 namespace trimci_core {
 namespace davidson_utils {
 

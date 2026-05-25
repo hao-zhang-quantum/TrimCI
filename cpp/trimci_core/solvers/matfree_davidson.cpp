@@ -12,10 +12,7 @@
 
 #include "bit_compat.hpp"
 
-#ifdef _OPENMP
 #include "omp_compat.hpp"
-#endif
-
 // High-performance hash map (same as detspace)
 #ifdef USE_ABSL
 #include <absl/container/flat_hash_map.h>
@@ -284,7 +281,7 @@ void precompute_connections(InverseMapData& data,
     #ifdef _OPENMP
     #pragma omp parallel for schedule(dynamic, 256)
     #endif
-    for (size_t d = 0; d < n_dets; ++d)
+    for (int d = 0; d < static_cast<int>(n_dets); ++d)
         data.h_diag_det[d] = compute_diagonal(
             data.all_dets[d].alpha, data.all_dets[d].beta, h1, eri, n_orb);
 
@@ -309,7 +306,7 @@ void precompute_connections(InverseMapData& data,
 #ifdef _OPENMP
         #pragma omp for schedule(dynamic, 64)
 #endif
-        for (size_t d_idx = 0; d_idx < n_dets; ++d_idx) {
+        for (int d_idx = 0; d_idx < static_cast<int>(n_dets); ++d_idx) {
             uint64_t alpha_d = data.all_dets[d_idx].alpha;
             uint64_t beta_d = data.all_dets[d_idx].beta;
             Det det_d = {alpha_d, beta_d};
@@ -444,7 +441,7 @@ void compute_Sv(const double* v, double* result, int n_basis,
 #ifdef _OPENMP
         #pragma omp for schedule(dynamic, 256)
 #endif
-        for (size_t d = 0; d < n_dets; ++d) {
+        for (int d = 0; d < static_cast<int>(n_dets); ++d) {
             const ContribVec& contribs = *data.all_dets[d].contribs;
             // Gather: sigma = sum c_mu * v[mu]
             double sigma = 0.0;
@@ -500,7 +497,7 @@ void compute_Hv(const double* v, double* result, int n_basis,
 #ifdef _OPENMP
         #pragma omp for schedule(static)
 #endif
-        for (size_t d = 0; d < n_dets; ++d) {
+        for (int d = 0; d < static_cast<int>(n_dets); ++d) {
             double val = data.h_diag_det[d] * sigma[d];
             for (const auto& [mu, c_mu] : *data.all_dets[d].contribs)
                 local[mu] += c_mu * val;
@@ -510,7 +507,7 @@ void compute_Hv(const double* v, double* result, int n_basis,
 #ifdef _OPENMP
         #pragma omp for schedule(static)
 #endif
-        for (size_t c = 0; c < n_conn; ++c) {
+        for (int c = 0; c < static_cast<int>(n_conn); ++c) {
             const auto& conn = data.connections[c];
             double h = conn.h_elem;
             double s1 = sigma[conn.d1], s2 = sigma[conn.d2];
@@ -562,7 +559,7 @@ void compute_diagonals(Eigen::VectorXd& H_diag, Eigen::VectorXd& S_diag,
 #ifdef _OPENMP
         #pragma omp for schedule(dynamic, 256)
 #endif
-        for (size_t d = 0; d < n_dets; ++d) {
+        for (int d = 0; d < static_cast<int>(n_dets); ++d) {
             const ContribVec& contribs = *data.all_dets[d].contribs;
             double h_dd = data.h_diag_det[d];
             for (const auto& [mu, c_mu] : contribs) {

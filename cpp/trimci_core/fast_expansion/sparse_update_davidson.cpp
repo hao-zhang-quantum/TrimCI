@@ -8,10 +8,7 @@
 #include <chrono>
 #include <random>
 
-#ifdef _OPENMP
 #include "omp_compat.hpp"
-#endif
-
 namespace trimci_core {
 namespace fe {
 

@@ -6,10 +6,7 @@
 #include <iostream>
 #include <iomanip>
 
-#ifdef _OPENMP
 #include "omp_compat.hpp"
-#endif
-
 namespace trimci_core {
 namespace fe {
 

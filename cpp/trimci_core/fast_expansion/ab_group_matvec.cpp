@@ -3,10 +3,7 @@
 #include "detspace_matvec.hpp"
 #include "hamiltonian.hpp"
 #include <cstring>
-#ifdef _OPENMP
 #include "omp_compat.hpp"
-#endif
-
 namespace trimci_core {
 namespace fe {
 

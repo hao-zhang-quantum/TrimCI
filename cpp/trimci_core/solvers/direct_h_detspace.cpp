@@ -11,10 +11,7 @@
 
 #include "bit_compat.hpp"
 
-#ifdef _OPENMP
 #include "omp_compat.hpp"
-#endif
-
 // High-performance hash map selection (matching project convention)
 #ifdef USE_ABSL
 #include <absl/container/flat_hash_map.h>
@@ -523,7 +520,7 @@ void build_H_detspace(
 #ifdef _OPENMP
             #pragma omp for schedule(dynamic, 64)
 #endif
-            for (size_t d_idx = 0; d_idx < n_dets; ++d_idx) {
+            for (int d_idx = 0; d_idx < static_cast<int>(n_dets); ++d_idx) {
                 const auto& entry = all_dets[d_idx];
                 uint64_t alpha_d = entry.alpha;
                 uint64_t beta_d = entry.beta;
@@ -645,7 +642,7 @@ void build_H_detspace(
 #ifdef _OPENMP
             #pragma omp for schedule(dynamic, 64)
 #endif
-            for (size_t d_idx = 0; d_idx < n_dets; ++d_idx) {
+            for (int d_idx = 0; d_idx < static_cast<int>(n_dets); ++d_idx) {
                 const auto& entry = all_dets[d_idx];
                 uint64_t alpha_d = entry.alpha;
                 uint64_t beta_d = entry.beta;
