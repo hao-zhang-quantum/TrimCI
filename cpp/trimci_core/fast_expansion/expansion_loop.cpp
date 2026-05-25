@@ -19,7 +19,7 @@
 #include <algorithm>
 #include <chrono>
 #include <numeric>
-#include <sys/stat.h>
+#include <filesystem>
 
 #include "parallel_sort.hpp"
 
@@ -72,8 +72,8 @@ static void save_checkpoint(
     using Clock = std::chrono::high_resolution_clock;
     auto t0 = Clock::now();
 
-    // Ensure directory exists (POSIX mkdir, ok if already exists)
-    mkdir(dir.c_str(), 0755);
+    // Ensure directory exists (portable; safe if already exists)
+    std::filesystem::create_directories(dir);
 
     std::string path = dir + "/checkpoint_round_" + std::to_string(round) + ".bin";
     std::ofstream f(path, std::ios::binary);
@@ -154,7 +154,7 @@ static void save_integrals_checkpoint(
     int n_orb,
     bool per_round = false)
 {
-    mkdir(dir.c_str(), 0755);
+    std::filesystem::create_directories(dir);
     std::string path = dir + "/checkpoint_integrals.bin";
     std::ofstream f(path, std::ios::binary);
     if (!f) {
