@@ -277,9 +277,7 @@ private:
         uint64_t result = lo_part + hi_part;
 #endif
         // Second reduction (hi can be up to 2^67)
-        uint64_t lo = result & PRIME;
-        uint64_t hi = result >> 61;
-        result = lo + hi;
+        result = (result & PRIME) + (result >> 61);
         if (result >= PRIME) result -= PRIME;
         return result;
     }
