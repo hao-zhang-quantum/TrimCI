@@ -5,14 +5,14 @@ See knowledge_docs/orblab_benchmark_and_usage.md for benchmark results and usage
 """
 
 import numpy as np
-import scipy.linalg
-from scipy.optimize import minimize
 import time
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from .auto_selector import get_functions_for_system
 from . import trimci_core # Bindings
-from pyscf import ao2mo
+# scipy.linalg / scipy.optimize.minimize are imported lazily inside the
+# OrbitalOptimizer methods that use them, so `import trimci` does not require
+# scipy at install time.
 from .TrimCI_runner.io_utils import read_fcidump
 import os
 from pathlib import Path
@@ -489,7 +489,8 @@ class OrbitalOptimizer:
             )
         else:
             # gradient_mode='none' means let scipy handle numerical gradient
-            res = minimize(objective, x0, method=method, 
+            from scipy.optimize import minimize
+            res = minimize(objective, x0, method=method,
                            jac=jac_wrapper if use_jac else None,
                            options=minimize_options,
                            callback=callback if (record_optimization or callback_func) else None)
@@ -1506,8 +1507,9 @@ class OrbitalOptimizer:
             val = x[idx]
             K[i, j] = val
             K[j, i] = -val
-        
-        return scipy.linalg.expm(K)
+
+        from scipy.linalg import expm
+        return expm(K)
 
 
 # Utility functions

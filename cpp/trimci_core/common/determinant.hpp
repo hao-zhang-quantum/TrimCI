@@ -9,6 +9,9 @@
 #include <type_traits>
 #include <unordered_set>
 
+// Provides __builtin_ctzll / __builtin_popcountll mappings on MSVC.
+#include "bit_compat.hpp"
+
 namespace trimci_core {
 
 // Bit manipulation utilities for different storage types

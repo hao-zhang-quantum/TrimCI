@@ -256,14 +256,29 @@ private:
         return h1 ^ (h2 * 0x9e3779b97f4a7c15ULL);
     }
 
-    /// Mersenne prime modular reduction for 128-bit product.
-    static uint64_t mod_mersenne_128(__uint128_t x) {
-        uint64_t lo = static_cast<uint64_t>(x) & PRIME;
-        uint64_t hi = static_cast<uint64_t>(x >> 61);
-        uint64_t result = lo + hi;
+    /// Multiply two uint64_t and reduce mod Mersenne prime (2^61 - 1).
+    /// Portable across GCC/Clang (native __uint128_t) and MSVC (_umul128).
+    static uint64_t mul_mod_mersenne(uint64_t a, uint64_t b) {
+#if defined(_MSC_VER)
+        // MSVC: _umul128 returns low 64 bits and writes high 64 bits via pointer.
+        // The 128-bit product is hi:lo where x = (hi << 64) | lo.
+        // x >> 61 = (hi << 3) | (lo >> 61); only the upper 61 bits of hi
+        // matter here because hash_a_/sign_a_ are < 2^61, so hi < 2^61
+        // and (hi << 3) fits in uint64_t.
+        uint64_t hi;
+        uint64_t lo = _umul128(a, b, &hi);
+        uint64_t lo_part = lo & PRIME;
+        uint64_t hi_part = (lo >> 61) | (hi << 3);
+        uint64_t result = lo_part + hi_part;
+#else
+        __uint128_t x = static_cast<__uint128_t>(a) * b;
+        uint64_t lo_part = static_cast<uint64_t>(x) & PRIME;
+        uint64_t hi_part = static_cast<uint64_t>(x >> 61);
+        uint64_t result = lo_part + hi_part;
+#endif
         // Second reduction (hi can be up to 2^67)
-        lo = result & PRIME;
-        hi = result >> 61;
+        uint64_t lo = result & PRIME;
+        uint64_t hi = result >> 61;
         result = lo + hi;
         if (result >= PRIME) result -= PRIME;
         return result;
@@ -271,16 +286,14 @@ private:
 
     /// Compute bucket index for row r.
     size_t compute_bucket(size_t r, uint64_t det_key) const {
-        __uint128_t ax = static_cast<__uint128_t>(hash_a_[r]) * det_key;
-        uint64_t axb = mod_mersenne_128(ax);
+        uint64_t axb = mul_mod_mersenne(hash_a_[r], det_key);
         axb = (axb + hash_b_[r]) % PRIME;  // safe: both < 2^61
         return static_cast<size_t>(axb & w_mask_);  // fast: w_ is power of 2
     }
 
     /// Compute sign (+1.0 or -1.0) for row r.
     double compute_sign(size_t r, uint64_t det_key) const {
-        __uint128_t ax = static_cast<__uint128_t>(sign_a_[r]) * det_key;
-        uint64_t axb = mod_mersenne_128(ax);
+        uint64_t axb = mul_mod_mersenne(sign_a_[r], det_key);
         axb = (axb + sign_b_[r]) % PRIME;
         return (axb & 1) ? -1.0 : 1.0;
     }

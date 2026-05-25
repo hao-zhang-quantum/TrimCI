@@ -18,7 +18,7 @@ if str(code_dir) not in sys.path:
     sys.path.append(str(code_dir))
 
 import numpy as np
-import scipy.linalg
+# scipy.linalg is imported lazily inside _compute_orbital_gradient_fd which uses it.
 try:
     from wavelab.wavefunction import Wavefunction
     from wavelab.transforms.rdm_transforms import compute_1rdm, compute_2rdm
