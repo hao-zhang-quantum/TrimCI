@@ -9,8 +9,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <string>
-#include <omp.h>
-
+#include "omp_compat.hpp"
 using namespace trimci_core::rdm_detail;
 
 namespace trimci_core {

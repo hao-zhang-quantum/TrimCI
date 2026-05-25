@@ -28,8 +28,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <string>
-#include <omp.h>
-
+#include "omp_compat.hpp"
 namespace trimci_core {
 
 std::tuple<std::vector<double>, std::vector<double>, std::vector<double>,

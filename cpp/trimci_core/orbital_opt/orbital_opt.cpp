@@ -8,7 +8,7 @@
 #include <iostream>
 #include <unordered_map>
 
-#include <omp.h>
+#include "omp_compat.hpp"
 #include <Eigen/Eigenvalues>
 
 #include "hamiltonian.hpp"

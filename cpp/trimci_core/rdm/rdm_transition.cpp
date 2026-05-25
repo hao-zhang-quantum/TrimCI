@@ -7,8 +7,7 @@
 #include "rdm_full.hpp"
 #include "rdm_helpers.hpp"
 #include <cmath>
-#include <omp.h>
-
+#include "omp_compat.hpp"
 using namespace trimci_core::rdm_detail;
 
 namespace trimci_core {

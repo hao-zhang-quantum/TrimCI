@@ -13,7 +13,7 @@
 #include <atomic>
 
 #ifdef _OPENMP
-#include <omp.h>
+#include "omp_compat.hpp"
 #endif
 
 namespace trimci_core {

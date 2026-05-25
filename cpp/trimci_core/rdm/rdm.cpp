@@ -4,7 +4,7 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
-#include <omp.h>
+#include "omp_compat.hpp"
 #include "bit_compat.hpp"
 
 namespace trimci_core {

@@ -12,7 +12,7 @@
 #include "bit_compat.hpp"
 
 #ifdef _OPENMP
-#include <omp.h>
+#include "omp_compat.hpp"
 #endif
 
 // High-performance hash map selection (matching project convention)
