@@ -9,9 +9,9 @@
 > 🔥 **v0.2.0 (May 2026):** Now supports **orbital optimization** and **fast expansion**. The complete three-phase workflow is exposed via the friendly `trimci.ground_state(...)` entry, or the production-grade `TrimCI_skill.py` template. Just `pip install trimci`.
 
 **Trimmed Configuration Interaction (TrimCI)** is a **high-performance** framework for quantum many-body and quantum chemistry calculation.
-It constructs accurate ground states *directly from random Slater determinants* — without any guiding ansatz, Hartree–Fock reference, or prior human knowledge — through an iterative expansion–trimming cycle on the determinant graph.
+It is an **auto-initializing** method: it constructs accurate ground states *directly from random Slater determinants* — requiring no pre-designed variational subspace, no guiding or trial wavefunction, and no chosen starting point — through an iterative expansion–trimming cycle on the determinant graph.
 
-TrimCI demonstrates that accurate many-body ground states can *emerge from randomness*, achieving state-of-the-art accuracy and efficiency across molecular and lattice systems. It can **outperform human-designed ansatzes or human-provided knowledge** in hard problems, such as strongly correlated systems.
+TrimCI demonstrates that accurate many-body ground states can *emerge from randomness*, achieving state-of-the-art accuracy and efficiency across molecular and lattice systems. It can **outperform human-designed ansätze** in hard problems, such as strongly correlated systems, where a reliable starting point is often unavailable.
 
 **Papers**
 
@@ -61,7 +61,7 @@ To push toward state-of-the-art accuracy, copy [`py/trimci/TrimCI_skill.py`](py/
 
 ## ✨ Key Features
 
-- **Emergent accuracy from randomness:** discovers the ground state without predefined ansatz or human bias.
+- **Auto-initializing:** discovers the ground state from random determinants, with no predefined ansatz and no chosen starting point.
 - **Expansion–trimming mechanism:** iteratively expands the determinant space via Hamiltonian couplings and trims away unimportant configurations.
 - **C++ backend, Python interface:** efficient C++ backend with OpenMP parallelization for core functions, while Python interface provides user-friendly access.
 - **Massive efficiency gain:** achieves equivalent accuracy to selected-CI using orders-of-magnitude fewer determinants (see Scientific Highlights).
